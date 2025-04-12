@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HappyCircuit</title>
+</head>
+<body>
+<h1>🤖 HappyCircuit 로봇 상태</h1>
+<div id="status">로딩 중...</div>
+
+<script>
+    fetch('/status')
+        .then(res => res.json())
+        .then(data => {
+            if (data.connected) {
+                document.getElementById('status').innerHTML = `
+                        ✅ 연결됨<br>
+                        위치: (${data.x}, ${data.y})<br>
+                        상태: ${data.state}
+                    `;
+            } else {
+                document.getElementById('status').innerText = '❌ 연결되지 않음';
+            }
+        })
+        .catch(err => {
+            document.getElementById('status').innerText = '⚠️ 상태 조회 실패';
+        });
+</script>
+</body>
+</html>
