@@ -1,30 +1,29 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>HappyCircuit</title>
-</head>
-<body>
-<h1>🤖 HappyCircuit 로봇 상태</h1>
-<div id="status">로딩 중...</div>
+{% extends "base.html" %}
+
+{% block title %}로봇 제어 홈{% endblock %}
+
+{% block content %}
+
+<h2>로봇 연결상태 확인</h2>
+<div id="cv-status">단선 검사 상태: 로딩 중...</div>
+<div id="slam-status">SLAM/제어 상태: 로딩 중...</div>
 
 <script>
     fetch('/status')
         .then(res => res.json())
         .then(data => {
-            if (data.connected) {
-                document.getElementById('status').innerHTML = `
-                        ✅ 연결됨<br>
-                        위치: (${data.x}, ${data.y})<br>
-                        상태: ${data.state}
-                    `;
-            } else {
-                document.getElementById('status').innerText = '❌ 연결되지 않음';
-            }
+            const cv = data.pi_cv;
+            const slam = data.pi_slam;
+
+            document.getElementById('cv-status').innerHTML =
+                cv.connected ? `✅ 연결됨 - ${cv.status}` : '❌ 단선 검사용 라즈베리파이 연결 안됨';
+
+            document.getElementById('slam-status').innerHTML =
+                slam.connected ? `✅ 연결됨 - ${slam.status}` : '❌ SLAM 제어용 라즈베리파이 연결 안됨';
         })
         .catch(err => {
-            document.getElementById('status').innerText = '⚠️ 상태 조회 실패';
+            document.getElementById('cv-status').innerText = '⚠️ 상태 조회 실패';
+            document.getElementById('slam-status').innerText = '⚠️ 상태 조회 실패';
         });
 </script>
-</body>
-</html>
+{% endblock %}

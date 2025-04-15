@@ -8,18 +8,20 @@ def index():
 
 @app.route('/status')
 def status():
-    connected = True # TODO : if raspberryPi can enable, edit this code
-    if connected:
-        return jsonify({
-            "connected": connected,
-            "x": 0,
-            "y": 0,
-            "state" : "waiting"
-        })
-    else:
-        return jsonify({
-            "connected": False
-        })
+     # TODO : if raspberryPi can enable, edit this code
+     pi_cv_connected = True
+     pi_slam_connected = True
+
+     return jsonify({
+         "pi_cv": {
+             "connected": pi_cv_connected,
+             "status": "OpenCV 단선 검사 준비됨" if pi_cv_connected else "연결 안됨"
+         },
+         "pi_slam": {
+             "connected": pi_slam_connected,
+             "status": "SLAM 및 하드웨어 제어 준비됨" if pi_slam_connected else "연결 안됨"
+         }
+     })
 
 if __name__ == '__main__':
     app.run(debug=True)
