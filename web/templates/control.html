@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>수동 조작</title>
+  <style>
+    /* 기본 페이지 스타일 */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      text-align: center;
+      background-color: #282c34;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden; /* 스크롤 방지 */
+    }
+
+    h1 {
+      margin-bottom: 40px;
+    }
+
+    /* 방향키(D-pad) 레이아웃 - CSS Grid 사용 */
+    .d-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 15px; /* 버튼 사이 간격 */
+    }
+
+    /* 모든 버튼의 공통 스타일 */
+    .button {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2.5em; /* 아이콘 크기 */
+      font-weight: bold;
+      color: white;
+      background-color: #61dafb; /* React 색상 테마 */
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      user-select: none; /* 모바일에서 길게 눌렀을 때 텍스트 선택 방지 */
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      transition: transform 0.1s ease, background-color 0.2s ease;
+    }
+
+    /* 버튼을 누르고 있을 때의 스타일 */
+    .button:active {
+      transform: scale(0.92);
+      background-color: #21a1f2;
+    }
+
+    /* 각 버튼의 위치 지정 */
+    .forward  { grid-column: 2; grid-row: 1; }
+    .left     { grid-column: 1; grid-row: 2; }
+    .stop     { grid-column: 2; grid-row: 2; background-color: #ff6b6b; }
+    .right    { grid-column: 3; grid-row: 2; }
+    .backward { grid-column: 2; grid-row: 3; }
+
+    /* 연결 상태 표시 */
+    #status {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 1em;
+      padding: 8px 15px;
+      border-radius: 10px;
+      background-color: #dc3545; /* 기본은 '연결 안됨' 색상 */
+      transition: background-color 0.5s;
+    }
+  </style>
+</head>
+<body>
+
+<h1>로봇 조종기</h1>
+<div id="status">연결 안됨</div>
+
+<div class="d-pad">
+  <div id="forward" class="button forward">↑</div>
+  <div id="left" class="button left">←</div>
+  <div id="stop" class="button stop">■</div>
+  <div id="right" class="button right">→</div>
+  <div id="backward" class="button backward">↓</div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  // DOM이 완전히 로드된 후 스크립트 실행
+  document.addEventListener('DOMContentLoaded', () => {
+
+    // 1. 서버의 웹소켓에 연결
+    const socket = io();
+    const statusDiv = document.getElementById('status');
+
+    // 2. 연결 이벤트 처리
+    socket.on('connect', () => {
+      console.log('서버에 성공적으로 연결되었습니다!');
+      statusDiv.textContent = '연결됨';
+      statusDiv.style.backgroundColor = '#28a745'; // '연결됨' 색상
+    });
+
+    socket.on('disconnect', () => {
+      console.log('서버와의 연결이 끊어졌습니다.');
+      statusDiv.textContent = '연결 안됨';
+      statusDiv.style.backgroundColor = '#dc3545';
+    });
+
+    // 3. 제어 명령을 서버로 보내는 함수
+    function sendCommand(direction) {
+      console.log(`명령 전송: ${direction}`);
+      // 'drive_command' 라는 이벤트 이름으로 서버에 데이터 전송
+      socket.emit('drive_command', { 'direction': direction });
+    }
+
+    // 4. 각 버튼에 이벤트 리스너(이벤트 처리기) 추가
+    //    - 마우스를 누르면 해당 방향으로, 떼면 'stop' 명령 전송
+    //    - 모바일 터치도 동일하게 지원
+    const buttons = [
+      { id: 'forward',  direction: 'forward' },
+      { id: 'backward', direction: 'backward' },
+      { id: 'left',     direction: 'left' },
+      { id: 'right',    direction: 'right' }
+    ];
+
+    buttons.forEach(btnInfo => {
+      const element = document.getElementById(btnInfo.id);
+
+      // 데스크탑용 마우스 이벤트
+      element.addEventListener('mousedown', () => sendCommand(btnInfo.direction));
+      element.addEventListener('mouseup', () => sendCommand('stop'));
+      element.addEventListener('mouseleave', () => sendCommand('stop')); // 버튼 영역 밖으로 마우스가 나가도 정지 (안전 기능)
+
+      // 모바일용 터치 이벤트
+      element.addEventListener('touchstart', (event) => {
+        event.preventDefault(); // 터치 시 화면이 스크롤되는 기본 동작 방지
+        sendCommand(btnInfo.direction);
+      });
+      element.addEventListener('touchend', () => sendCommand('stop'));
+    });
+
+    // 정지 버튼은 한 번 클릭하는 것으로 동작
+    document.getElementById('stop').addEventListener('click', () => sendCommand('stop'));
+  });
+</script>
+</body>
+</html>

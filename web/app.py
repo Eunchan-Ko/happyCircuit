@@ -4,6 +4,8 @@ eventlet.monkey_patch()
 
 from flask import Flask, render_template
 from flask_socketio import SocketIO
+from control.routes import control_bp
+from control.robot_controller import send_drive_command
 import roslibpy
 import threading
 import logging
@@ -14,6 +16,8 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(
 
 # --- Flask 및 SocketIO 앱 초기화 ---
 app = Flask(__name__)
+# --- Flask 앱에 /control 루트 추가 ---
+app.register_blueprint(control_bp)
 # secret_key는 SocketIO에 필요할 수 있습니다.
 app.config['SECRET_KEY'] = 'secret!'
 # 모든 출처에서의 연결을 허용합니다 (개발용).
@@ -93,31 +97,7 @@ class RosBridgeClientThread(threading.Thread):
             '/cmd_vel',                 # 토픽 이름
             'geometry_msgs/Twist'       # 메시지 타입
         )
-        logging.info("'/cmd_vel' 토픽 퍼블리셔 생성 완료.")
-
-    def drive_robot(self, direction):
-        if not self.is_connected or not self.cmd_vel_publisher:
-            logging.warning("ROS가 연결되지 않았거나 퍼블리셔가 준비되지 않았습니다.")
-            return
-
-        # 속도 값 설정
-        linear_speed = 0.15  # m/s
-        angular_speed = 0.5  # rad/s
-
-        twist_msg = {'linear': {'x': 0.0, 'y': 0.0, 'z': 0.0}, 'angular': {'x': 0.0, 'y': 0.0, 'z': 0.0}}
-
-        if direction == 'forward':
-            twist_msg['linear']['x'] = linear_speed
-        elif direction == 'backward':
-            twist_msg['linear']['x'] = -linear_speed
-        elif direction == 'left':
-            twist_msg['angular']['z'] = angular_speed
-        elif direction == 'right':
-            twist_msg['angular']['z'] = -angular_speed
-        # 'stop'의 경우 모든 값이 0이므로 기본값을 그대로 사용
-
-        logging.info(f"로봇 제어 명령 발행: {direction}")
-        self.cmd_vel_publisher.publish(roslibpy.Message(twist_msg))
+        logging.info("[ROS Thread]'/cmd_vel' 토픽 퍼블리셔 생성 완료.")
 
     def odom_callback(self, message):
         """/odom 토픽에서 메시지를 수신할 때마다 호출됩니다."""
@@ -200,6 +180,18 @@ def handle_web_client_connect():
 def handle_web_client_disconnect():
     """웹 클라이언트의 연결이 끊어졌을 때 호출됩니다."""
     logging.info("[Web Server] 클라이언트 연결 끊어짐")
+
+# 웹 클라이언트에서 drive 명령을 입력했을 때 호출됩니다.
+@socketio.on('drive_command')
+def handle_drive_command(data):
+    """웹의 조작 명령을 받아, control 패키지의 함수를 호출해주는 연결고리"""
+    direction = data.get('direction')
+    if direction:
+        # 1. 메인 ROS 연결 객체에서 cmd_vel_publisher를 가져옵니다.
+        publisher = ros_thread.cmd_vel_publisher
+
+        # 2. control 패키지에 있는 함수에게 publisher와 direction을 넘겨줍니다.
+        send_drive_command(publisher, direction)
 
 if __name__ == '__main__':
     # 1. RosBridge 클라이언트 스레드 인스턴스 생성 및 시작
