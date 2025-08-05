@@ -1,39 +1,43 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>{% block title %}HappyCircuit{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-</head>
-<body>
-  <div class="wrapper">
-    <header>
-      <nav class="navbar">
-        <div class="logo">🤖 HappyCircuit</div>
-        <div class="menu-toggle" onclick="toggleMenu()">☰</div>
-        <ul class="nav-links" id="navMenu">
-          <li><a href="/">홈</a></li>
-          <li><a href="/control">수동 조작</a></li>
-          <li><a href="/map">SLAM 맵</a></li>
-          <li><a href="/settings">설정</a></li>
-        </ul>
-      </nav>
-    </header>
+  <head>
+    <meta charset="UTF-8">
+    <title>{% block title %}HappyCircuit{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <nav class="navbar">
+          <div class="logo">🤖 HappyCircuit</div>
+          <div class="menu-toggle" onclick="toggleMenu()">☰</div>
+          <ul class="nav-links" id="navMenu">
+            <li><a href="/">홈</a></li>
+            <li><a href="/control">수동 조작</a></li>
+            <li><a href="/map">SLAM 맵</a></li>
+            <li><a href="/settings">설정</a></li>
+          </ul>
+        </nav>
+      </header>
 
-    <main>
-      {% block content %}{% endblock %}
-    </main>
+      <main>
+        {% block content %}{% endblock %}
+      </main>
 
-    <footer>
-      &copy; 2025 HappyCircuit. All rights reserved.
-    </footer>
+      <footer>
+        &copy; 2025 HappyCircuit. All rights reserved.
+      </footer>
 
-    <script>
-      function toggleMenu() {
-        const menu = document.getElementById('navMenu');
-        menu.classList.toggle('active');
-      }
-    </script>
-  </div>
-</body>
+      <script>
+        // 메뉴 토글 같은 공통 스크립트는 base.html에 둡니다.
+        function toggleMenu() {
+          const menu = document.getElementById('navMenu');
+          menu.classList.toggle('active');
+        }
+      </script>
+
+      {% block scripts %}{% endblock %}
+    </div>
+  </body>
 </html>

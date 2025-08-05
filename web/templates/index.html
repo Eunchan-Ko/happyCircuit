@@ -3,27 +3,41 @@
 {% block title %}로봇 제어 홈{% endblock %}
 
 {% block content %}
+<h1>로봇 실시간 현황</h1>
+<hr>
+<div class="status-card">
+    <h2>CV 모듈</h2>
+    <p><strong>연결 상태:</strong> <span id="cv-connected" style="color:red;">연결 안됨</span></p>
+    <p><strong>상세 정보:</strong> <span id="cv-status">서버로부터 정보 수신 대기 중...</span></p>
+</div>
+<div class="status-card">
+    <h2>SLAM 모듈</h2>
+    <p><strong>연결 상태:</strong> <span id="slam-connected" style="color:red;">연결 안됨</span></p>
+    <p><strong>상세 정보:</strong> <span id="slam-status">서버로부터 정보 수신 대기 중...</span></p>
+</div>
+<div class="status-card">
+    <h2>ROS Core (rosbridge)</h2>
+</div>
 
-<h2>로봇 연결상태 확인</h2>
-<div id="cv-status">단선 검사 상태: 로딩 중...</div>
-<div id="slam-status">SLAM/제어 상태: 로딩 중...</div>
+<!-- 배터리 상태 카드 (추가됨) -->
+<div class="status-card">
+    <h2>배터리 상태 (/battery_state)</h2>
+    <p><strong>전압:</strong> <span id="battery-voltage">N/A</span> V</p>
+    <div style="background-color: #e9ecef; border-radius: .25rem; overflow: hidden;">
+        <div id="battery-progress" style="width: 0; background-color: #28a745; color: white; text-align: center; line-height: 20px; height: 20px; transition: width 0.5s ease;">
+            <span id="battery-percentage">N/A</span>
+        </div>
+    </div>
+</div>
 
-<script>
-    fetch('/status')
-        .then(res => res.json())
-        .then(data => {
-            const cv = data.pi_cv;
-            const slam = data.pi_slam;
+<div class="status-card">
+    <h2>Odometry (/odom)</h2>
+    <p><strong>X 위치:</strong> <span id="odom-x">N/A</span> m</p>
+    <p><strong>Y 위치:</strong> <span id="odom-y">N/A</span> m</p>
+    <p><strong>방향:</strong> <span id="odom-theta">N/A</span> °</p>
+</div>
+{% endblock %}
 
-            document.getElementById('cv-status').innerHTML =
-                cv.connected ? `✅ 연결됨 - ${cv.status}` : '❌ 단선 검사용 라즈베리파이 연결 안됨';
-
-            document.getElementById('slam-status').innerHTML =
-                slam.connected ? `✅ 연결됨 - ${slam.status}` : '❌ SLAM 제어용 라즈베리파이 연결 안됨';
-        })
-        .catch(err => {
-            document.getElementById('cv-status').innerText = '⚠️ 상태 조회 실패';
-            document.getElementById('slam-status').innerText = '⚠️ 상태 조회 실패';
-        });
-</script>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/socket.js') }}"></script>
 {% endblock %}
