@@ -5,6 +5,7 @@
     <title>{% block title %}HappyCircuit{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    {% block styles %}{% endblock %}
   </head>
   <body>
     <div class="wrapper">

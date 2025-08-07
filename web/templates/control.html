@@ -1,79 +1,12 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>수동 조작</title>
-  <style>
-    /* 기본 페이지 스타일 */
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      text-align: center;
-      background-color: #282c34;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      overflow: hidden; /* 스크롤 방지 */
-    }
+{% extends "base.html" %}
 
-    h1 {
-      margin-bottom: 40px;
-    }
+{% block title %}수동 조작 - HappyCircuit{% endblock %}
 
-    /* 방향키(D-pad) 레이아웃 - CSS Grid 사용 */
-    .d-pad {
-      display: grid;
-      grid-template-columns: repeat(3, 100px);
-      grid-template-rows: repeat(3, 100px);
-      gap: 15px; /* 버튼 사이 간격 */
-    }
+{% block content %}
 
-    /* 모든 버튼의 공통 스타일 */
-    .button {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 2.5em; /* 아이콘 크기 */
-      font-weight: bold;
-      color: white;
-      background-color: #61dafb; /* React 색상 테마 */
-      border: none;
-      border-radius: 20px;
-      cursor: pointer;
-      user-select: none; /* 모바일에서 길게 눌렀을 때 텍스트 선택 방지 */
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      transition: transform 0.1s ease, background-color 0.2s ease;
-    }
-
-    /* 버튼을 누르고 있을 때의 스타일 */
-    .button:active {
-      transform: scale(0.92);
-      background-color: #21a1f2;
-    }
-
-    /* 각 버튼의 위치 지정 */
-    .forward  { grid-column: 2; grid-row: 1; }
-    .left     { grid-column: 1; grid-row: 2; }
-    .stop     { grid-column: 2; grid-row: 2; background-color: #ff6b6b; }
-    .right    { grid-column: 3; grid-row: 2; }
-    .backward { grid-column: 2; grid-row: 3; }
-
-    /* 연결 상태 표시 */
-    #status {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      font-size: 1em;
-      padding: 8px 15px;
-      border-radius: 10px;
-      background-color: #dc3545; /* 기본은 '연결 안됨' 색상 */
-      transition: background-color 0.5s;
-    }
-  </style>
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/control.css') }}">
+{% endblock %}
 </head>
 <body>
 
@@ -87,7 +20,9 @@
   <div id="right" class="button right">→</div>
   <div id="backward" class="button backward">↓</div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
   // DOM이 완전히 로드된 후 스크립트 실행
@@ -96,25 +31,51 @@
     // 1. 서버의 웹소켓에 연결
     const socket = io();
     const statusDiv = document.getElementById('status');
+    // 입력 이벤트를 처리하기 위한 버튼 인식
+    const allControlButtons = document.querySelectorAll('.d-pad .button');
 
     // 2. 연결 이벤트 처리
-    socket.on('connect', () => {
-      console.log('서버에 성공적으로 연결되었습니다!');
-      statusDiv.textContent = '연결됨';
-      statusDiv.style.backgroundColor = '#28a745'; // '연결됨' 색상
-    });
+    socket.on('status_update', (data) => {
+      // 서버에서 보낸 robot_status 객체에서 실제 로봇 연결 상태를 확인
+      const isRobotConnected = data.pi_slam.rosbridge_connected;
 
-    socket.on('disconnect', () => {
-      console.log('서버와의 연결이 끊어졌습니다.');
-      statusDiv.textContent = '연결 안됨';
-      statusDiv.style.backgroundColor = '#dc3545';
+      console.log('상태 업데이트 수신:', data); // 디버깅용 로그
+
+      if (isRobotConnected) {
+        console.log('서버에 성공적으로 연결되었습니다!');
+        statusDiv.textContent = '연결됨';
+        statusDiv.style.backgroundColor = '#28a745'; // 초록색
+      } else {
+        console.log('서버와의 연결이 끊어졌습니다.');
+        statusDiv.textContent = '연결 안됨';
+        statusDiv.style.backgroundColor = '#dc3545'; // 빨간색
+      }
     });
 
     // 3. 제어 명령을 서버로 보내는 함수
     function sendCommand(direction) {
       console.log(`명령 전송: ${direction}`);
-      // 'drive_command' 라는 이벤트 이름으로 서버에 데이터 전송
       socket.emit('drive_command', { 'direction': direction });
+
+      // --- UI 업데이트 로직 ---
+      // 1. 먼저 모든 버튼의 활성 상태를 초기화
+      allControlButtons.forEach(btn => btn.classList.remove('active-command'));
+
+      // 2. 현재 명령에 맞는 버튼을 찾아 활성 클래스 추가
+      if (direction !== 'stop') {
+        const activeButton = document.getElementById(direction);
+        if (activeButton) {
+          activeButton.classList.add('active-command');
+        }
+      } else {
+        const stopButton = document.getElementById('stop');
+        if (stopButton) {
+          stopButton.classList.add('active-command');
+          setTimeout(() => {
+            stopButton.classList.remove('active-command');
+          }, 200);
+        }
+      }
     }
 
     // 4. 각 버튼에 이벤트 리스너(이벤트 처리기) 추가
@@ -145,7 +106,63 @@
 
     // 정지 버튼은 한 번 클릭하는 것으로 동작
     document.getElementById('stop').addEventListener('click', () => sendCommand('stop'));
+
+    // 키보드 조작으로도 로봇이 조작 가능하도록 인식되는 버튼을 추가
+    let keydownState = {};
+    document.addEventListener('keydown', (event) => {
+      // 이미 해당 키가 눌려있으면 중복 실행 방지
+      if (keydownState[event.key]) {
+        return;
+      }
+      keydownState[event.key] = true;
+
+      // 키에 따라 다른 명령 전송
+      switch (event.key) {
+        case 'w':
+        case 'W':
+        case 'ㅈ':
+        case 'ArrowUp':
+          sendCommand('forward');
+          break;
+        case 'x':
+        case 'X':
+        case 'ㅌ':
+        case 'ArrowDown':
+          sendCommand('backward');
+          break;
+        case 'a':
+        case 'A':
+        case 'ㅁ':
+        case 'ArrowLeft':
+          sendCommand('left');
+          break;
+        case 'd':
+        case 'D':
+        case 'ㅇ':
+        case 'ArrowRight':
+          sendCommand('right');
+          break;
+        case 's':
+        case 'S':
+        case 'ㄴ':
+        case ' ': // 스페이스바
+          sendCommand('stop');
+          break;
+      }
+    });
+
+    document.addEventListener('keyup', (event) => {
+      // 키 눌림 상태 해제
+      keydownState[event.key] = false;
+
+      // 어떤 키에서든 손을 떼면 'stop' 명령을 보내 안전하게 정지
+      // (단, 정지 키 자체는 제외하여 불필요한 중복 명령 방지)
+      const stopKeys = ['s', 'S', 'ㄴ', ' '];
+      if (!stopKeys.includes(event.key)) {
+        sendCommand('stop');
+      }
+    });
   });
 </script>
 </body>
-</html>
+{% endblock %}

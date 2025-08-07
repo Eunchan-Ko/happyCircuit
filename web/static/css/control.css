@@ -1,0 +1,80 @@
+/* 기본 페이지 스타일 */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    text-align: center;
+    background-color: #282c34;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden; /* 스크롤 방지 */
+}
+
+h1 {
+    padding: 13px 0;
+    margin-bottom: 40px;
+}
+
+/* 방향키(D-pad) 레이아웃 - CSS Grid 사용 */
+.d-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    grid-template-rows: repeat(3, 100px);
+    gap: 15px; /* 버튼 사이 간격 */
+    align-self: center;
+}
+
+/* 모든 버튼의 공통 스타일 */
+.button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2.5em; /* 아이콘 크기 */
+    font-weight: bold;
+    color: white;
+    background-color: #61dafb; /* React 색상 테마 */
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    user-select: none; /* 모바일에서 길게 눌렀을 때 텍스트 선택 방지 */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.1s ease, background-color 0.2s ease;
+}
+
+/* 버튼을 누르고 있을 때의 스타일 */
+.button:active {
+    transform: scale(0.92);
+    background-color: #21a1f2;
+}
+
+/* 각 버튼의 위치 지정 */
+.forward  { grid-column: 2; grid-row: 1; }
+.left     { grid-column: 1; grid-row: 2; }
+.stop     { grid-column: 2; grid-row: 2; background-color: #ff6b6b; }
+.right    { grid-column: 3; grid-row: 2; }
+.backward { grid-column: 2; grid-row: 3; }
+
+/* 연결 상태 표시 */
+#status {
+    position: absolute;
+    top: 80px;
+    right: 20px;
+    font-size: 1em;
+    padding: 8px 15px;
+    border-radius: 10px;
+    background-color: #dc3545; /* 기본은 '연결 안됨' 색상 */
+    transition: background-color 0.5s;
+}
+
+.button.active-command {
+    transform: scale(0.92);
+    background-color: #21a1f2; /* 방향키 활성화 색상 */
+}
+
+/* 정지 버튼은 활성화될 때 다른 색을 갖도록 별도 지정 */
+.stop.button.active-command {
+    background-color: #e04b4b; /* 더 진한 빨간색 */
+}
