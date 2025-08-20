@@ -27,7 +27,8 @@
 <script>
   // DOM이 완전히 로드된 후 스크립트 실행
   document.addEventListener('DOMContentLoaded', () => {
-
+    // 0. 전역변수 설정
+    let isRobotConnected = false;
     // 1. 서버의 웹소켓에 연결
     const socket = io();
     const statusDiv = document.getElementById('status');
@@ -37,7 +38,8 @@
     // 2. 연결 이벤트 처리
     socket.on('status_update', (data) => {
       // 서버에서 보낸 robot_status 객체에서 실제 로봇 연결 상태를 확인
-      const isRobotConnected = data.pi_slam.rosbridge_connected;
+
+      isRobotConnected = data.pi_slam.rosbridge_connected;
 
       console.log('상태 업데이트 수신:', data); // 디버깅용 로그
 
@@ -54,6 +56,14 @@
 
     // 3. 제어 명령을 서버로 보내는 함수
     function sendCommand(direction) {
+      if (!isRobotConnected) {
+        console.log('서버와의 연결이 끊어졌습니다.');
+        statusDiv.textContent = '연결 안됨';
+        statusDiv.style.backgroundColor = '#dc3545'; // 빨간색
+        alert('로봇과 연결되지 않았습니다.\n서버 및 로봇의 상태를 확인해주세요.');
+        return; // 연결이 안 됐으면 여기서 함수 실행 중단
+      }
+
       console.log(`명령 전송: ${direction}`);
       socket.emit('drive_command', { 'direction': direction });
 

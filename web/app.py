@@ -5,7 +5,8 @@ eventlet.monkey_patch()
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 from control.routes import control_bp
-from control.robot_controller import send_drive_command
+from disconnection_check.routes import disconnection_check_bp
+from control.robot_controller import SmoothRobotController
 import roslibpy
 import threading
 import logging
@@ -18,6 +19,7 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(
 app = Flask(__name__)
 # --- Flask 앱에 /control 루트 추가 ---
 app.register_blueprint(control_bp)
+app.register_blueprint(disconnection_check_bp)
 # secret_key는 SocketIO에 필요할 수 있습니다.
 app.config['SECRET_KEY'] = 'secret!'
 # 모든 출처에서의 연결을 허용합니다 (개발용).
@@ -38,9 +40,11 @@ class RosBridgeClientThread(threading.Thread):
         self.ros_client = None
         self.is_running = True # 스레드의 실행 상태를 제어하는 플래그를 초기화합니다.
 
-        self.ros_host = '172.20.10.10'
+        self.ros_host = '192.168.1.8'
         self.ros_port = 9090
-
+        # robot controll attribute 등록
+        self.robot_controller = None
+        self.cmd_vel_publisher = None
     def run(self):
         """ ‼️ 수정된 부분: 재연결을 위한 무한 루프 """
         logging.info("[ROS Thread] ROS 클라이언트 스레드를 시작합니다.")
@@ -98,6 +102,13 @@ class RosBridgeClientThread(threading.Thread):
             'geometry_msgs/Twist'       # 메시지 타입
         )
         logging.info("[ROS Thread]'/cmd_vel' 토픽 퍼블리셔 생성 완료.")
+
+        # 제어를 위한 컨트롤러 생성
+        if self.robot_controller:
+            self.robot_controller.stop()
+        logging.info("[ROS Thread] SmoothRobotController를 생성하고 시작합니다.")
+        self.robot_controller = SmoothRobotController(self.cmd_vel_publisher)
+        self.robot_controller.start()
 
     def odom_callback(self, message):
         """/odom 토픽에서 메시지를 수신할 때마다 호출됩니다."""
@@ -184,14 +195,12 @@ def handle_web_client_disconnect():
 # 웹 클라이언트에서 drive 명령을 입력했을 때 호출됩니다.
 @socketio.on('drive_command')
 def handle_drive_command(data):
-    """웹의 조작 명령을 받아, control 패키지의 함수를 호출해주는 연결고리"""
     direction = data.get('direction')
-    if direction:
-        # 1. 메인 ROS 연결 객체에서 cmd_vel_publisher를 가져옵니다.
-        publisher = ros_thread.cmd_vel_publisher
-
-        # 2. control 패키지에 있는 함수에게 publisher와 direction을 넘겨줍니다.
-        send_drive_command(publisher, direction)
+    # 컨트롤러가 생성되었고(즉, ROS가 연결됨), 방향 값이 있을 때만 실행
+    if ros_thread.robot_controller and direction:
+        ros_thread.robot_controller.set_direction(direction)
+    elif not ros_thread.robot_controller:
+        logging.warning("[Web Server] 로봇 컨트롤러가 준비되지 않아 drive_command를 무시합니다.")
 
 if __name__ == '__main__':
     # 1. RosBridge 클라이언트 스레드 인스턴스 생성 및 시작
