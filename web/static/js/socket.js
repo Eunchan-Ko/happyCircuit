@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', (event) => {
         console.log('상태 업데이트 수신:', data);
 
         // CV 모듈 정보 업데이트
+        const piCvConnectedEl = document.getElementById('pi-cv-connected');
+        const piCvStatusEl = document.getElementById('pi-cv-status');
         const slamConnectedEl = document.getElementById('slam-connected');
         const slamStatusEl = document.getElementById('slam-status');
         const odomXEl = document.getElementById('odom-x');
@@ -29,43 +31,60 @@ document.addEventListener('DOMContentLoaded', (event) => {
         const batteryVoltageEl = document.getElementById('battery-voltage');
         const batteryProgressEl = document.getElementById('battery-progress');
 
+        // --- pi_cv 객체가 있는지 확인 ---
+        const cvData = data.pi_cv;
+        if (cvData && piCvConnectedEl) {
+            if (cvData.connected) {
+                piCvConnectedEl.textContent = '연결됨';
+                piCvConnectedEl.style.color = 'green';
+                piCvStatusEl.textContent = cvData.status;
+            } else {
+                piCvConnectedEl.textContent = '연결 안됨';
+                piCvConnectedEl.style.color = 'red';
+                piCvStatusEl.textContent = cvData.status;
+            }
+        }
+
         // --- pi_slam 객체가 있는지 확인 ---
         const slamData = data.pi_slam;
-        if (!slamData) {
-            console.error("수신된 데이터에 'pi_slam' 객체가 없습니다.");
-            return;
-        }
-        // ✅ [수정] SLAM 모듈 연결 상태 업데이트
-        if (slamData.rosbridge_connected) {
-            slamConnectedEl.textContent = '연결됨';
-            slamConnectedEl.style.color = 'green';
-            slamStatusEl.textContent = '실시간 데이터 수신 중...';
-        } else {
-            slamConnectedEl.textContent = '연결 안됨';
-            slamConnectedEl.style.color = 'red';
-            slamStatusEl.textContent = '서버로부터 정보 수신 대기 중...';
-        }
-
-        // ✅ [수정] Odometry 데이터 업데이트
-        if (slamData.last_odom) {
-            odomXEl.textContent = slamData.last_odom.x;
-            odomYEl.textContent = slamData.last_odom.y;
-            odomThetaEl.textContent = slamData.last_odom.theta;
-        }
-
-        // ✅ [수정] 배터리 데이터 업데이트
-        if (slamData.battery && batteryProgressEl && batteryPercentageEl && batteryVoltageEl) {
-            const percentage = slamData.battery.percentage;
-            const voltage = slamData.battery.voltage;
-
-            if (percentage !== 'N/A') {
-                batteryProgressEl.style.width = percentage + '%';
-                batteryPercentageEl.textContent = percentage + '%';
+        if (slamData && slamConnectedEl) {
+            if (slamData.rosbridge_connected) {
+                slamConnectedEl.textContent = '연결됨';
+                slamConnectedEl.style.color = 'green';
+                slamStatusEl.textContent = '실시간 데이터 수신 중...';
             } else {
-                batteryProgressEl.style.width = '0%';
-                batteryPercentageEl.textContent = 'N/A';
+                slamConnectedEl.textContent = '연결 안됨';
+                slamConnectedEl.style.color = 'red';
+                slamStatusEl.textContent = '서버로부터 정보 수신 대기 중...';
             }
-            batteryVoltageEl.textContent = voltage;
+
+            if (slamData.last_odom) {
+                odomXEl.textContent = slamData.last_odom.x;
+                odomYEl.textContent = slamData.last_odom.y;
+                odomThetaEl.textContent = slamData.last_odom.theta;
+            }
+
+            if (slamData.battery && batteryProgressEl && batteryPercentageEl && batteryVoltageEl) {
+                const percentage = slamData.battery.percentage;
+                const voltage = slamData.battery.voltage;
+
+                if (percentage !== 'N/A') {
+                    batteryProgressEl.style.width = percentage + '%';
+                    batteryPercentageEl.textContent = percentage + '%';
+                } else {
+                    batteryProgressEl.style.width = '0%';
+                    batteryPercentageEl.textContent = 'N/A';
+                }
+                batteryVoltageEl.textContent = voltage;
+            }
+        }
+    });
+
+    // 'new_image' 이벤트를 수신 대기
+    socket.on('new_image', (data) => {
+        const videoStream = document.getElementById('video-stream');
+        if (videoStream) {
+            videoStream.src = 'data:image/jpeg;base64,' + data.image;
         }
     });
 

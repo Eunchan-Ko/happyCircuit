@@ -1,2 +1,9 @@
 ultralytics
 opencv-python
+flask
+flask-socketio
+eventlet
+python-socketio[client]
+websocket-client
+roslibpy
+requests

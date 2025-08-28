@@ -1,40 +1,67 @@
 {% extends "base.html" %}
 
-{% block title %}로봇 제어 홈{% endblock %}
+{% block title %}HappyCircuit - 홈{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% endblock %}
 
 {% block content %}
-<h1>로봇 실시간 현황</h1>
-<hr>
-<div class="status-card">
-    <h2>CV 모듈</h2>
-    <p><strong>연결 상태:</strong> <span id="cv-connected" style="color:red;">연결 안됨</span></p>
-    <p><strong>상세 정보:</strong> <span id="cv-status">서버로부터 정보 수신 대기 중...</span></p>
-</div>
-<div class="status-card">
-    <h2>SLAM 모듈</h2>
-    <p><strong>연결 상태:</strong> <span id="slam-connected" style="color:red;">연결 안됨</span></p>
-    <p><strong>상세 정보:</strong> <span id="slam-status">서버로부터 정보 수신 대기 중...</span></p>
-</div>
-<div class="status-card">
-    <h2>ROS Core (rosbridge)</h2>
-</div>
+<div class="home-container">
+    <div class="intro-box">
+        <h1>HappyCircuit 로봇 제어 시스템</h1>
+        <p>환영합니다! 아래 메뉴를 통해 로봇을 제어하고 상태를 확인하세요.</p>
+    </div>
 
-<!-- 배터리 상태 카드 (추가됨) -->
-<div class="status-card">
-    <h2>배터리 상태 (/battery_state)</h2>
-    <p><strong>전압:</strong> <span id="battery-voltage">N/A</span> V</p>
-    <div style="background-color: #e9ecef; border-radius: .25rem; overflow: hidden;">
-        <div id="battery-progress" style="width: 0; background-color: #28a745; color: white; text-align: center; line-height: 20px; height: 20px; transition: width 0.5s ease;">
-            <span id="battery-percentage">N/A</span>
+    <div class="card-container">
+        <a href="{{ url_for('control.control_page') }}" class="card">
+            <div class="card-icon">🎮</div>
+            <h2>수동 조작</h2>
+            <p>로봇을 직접 조종하여 원하는 작업을 수행합니다.</p>
+        </a>
+
+        <a href="{{ url_for('disconnection_check.disconnection_check_page') }}" class="card">
+            <div class="card-icon">🔌</div>
+            <h2>단선 확인</h2>
+            <p>이미지를 분석하여 케이블의 단선 여부를 확인합니다.</p>
+        </a>
+
+        <a href="#" class="card disabled">
+            <div class="card-icon">🗺️</div>
+            <h2>SLAM 맵 (준비중)</h2>
+            <p>실시간으로 생성되는 로봇의 주변 환경 지도를 확인합니다.</p>
+        </a>
+    </div>
+
+    <!-- Real-time Status Container -->
+    <div class="status-container">
+        <h2>실시간 로봇 상태</h2>
+        <div class="status-grid">
+            <div class="status-item">
+                <h3>ROS 연결 상태</h3>
+                <p id="slam-connected" class="status-disconnected">연결 안됨</p>
+                <small id="slam-status">서버로부터 정보 수신 대기 중...</small>
+            </div>
+            <div class="status-item">
+                <h3>배터리 상태</h3>
+                <div class="battery-display">
+                    <div id="battery-progress" style="width: 0%;"></div>
+                    <span id="battery-percentage">N/A</span>
+                </div>
+                <small>전압: <span id="battery-voltage">N/A</span> V</small>
+            </div>
+            <div class="status-item">
+                <h3>Odometry</h3>
+                <small>X: <span id="odom-x">N/A</span> m, Y: <span id="odom-y">N/A</span> m</small>
+                <small>θ: <span id="odom-theta">N/A</span> °</small>
+            </div>
+            <div class="status-item">
+                <h3>이미지 모듈 <br> 연결 상태</h3>
+                <p id="pi-cv-connected" class="status-disconnected">연결 안됨</p>
+                <small id="pi-cv-status">서버로부터 정보 수신 대기 중...</small>
+            </div>
         </div>
     </div>
-</div>
-
-<div class="status-card">
-    <h2>Odometry (/odom)</h2>
-    <p><strong>X 위치:</strong> <span id="odom-x">N/A</span> m</p>
-    <p><strong>Y 위치:</strong> <span id="odom-y">N/A</span> m</p>
-    <p><strong>방향:</strong> <span id="odom-theta">N/A</span> °</p>
 </div>
 {% endblock %}
 

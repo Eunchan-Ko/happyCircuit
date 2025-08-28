@@ -11,6 +11,11 @@ import roslibpy
 import threading
 import logging
 import math
+import websocket
+import base64
+
+# --- 설정 파일 로드 ---
+import config
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
@@ -31,6 +36,51 @@ robot_status = {
     "pi_slam": { "rosbridge_connected": False, "last_odom": { "x": 0.0, "y": 0.0, "theta": 0.0 }, "battery":{"percentage":"N/A", "voltage":"N/A"} }
 }
 
+# --- Image 클라이언트 스레드 ---
+class ImageClientThread(threading.Thread):
+    def __init__(self, socketio_instance):
+        super().__init__()
+        self.daemon = True
+        self.socketio = socketio_instance
+        self.is_running = True
+        self.ws = None
+        self.host = config.PI_CV_WEBSOCKET_HOST
+        self.port = config.PI_CV_WEBSOCKET_PORT
+
+    def run(self):
+        logging.info("[Image Thread] 이미지 클라이언트 스레드를 시작합니다.")
+        while self.is_running:
+            try:
+                self.ws = websocket.create_connection(f"ws://{self.host}:{self.port}")
+                robot_status['pi_cv']['connected'] = True
+                robot_status['pi_cv']['status'] = "연결됨"
+                self.socketio.emit('status_update', robot_status)
+                logging.info(f"[Image Thread] 이미지 서버 ({self.host}:{self.port})에 연결되었습니다.")
+                while self.is_running:
+                    try:
+                        message = self.ws.recv()
+                        self.socketio.emit('new_image', {'image': message})
+                    except websocket.WebSocketConnectionClosedException:
+                        logging.warning("[Image Thread] 이미지 서버와의 연결이 끊어졌습니다.")
+                        break
+            except Exception as e:
+                logging.error(f"[Image Thread] 이미지 서버 연결 실패: {e}")
+
+            robot_status['pi_cv']['connected'] = False
+            robot_status['pi_cv']['status'] = "연결 안됨"
+            self.socketio.emit('status_update', robot_status)
+            
+            if self.is_running:
+                logging.info("[Image Thread] 5초 후 재연결을 시도합니다.")
+                eventlet.sleep(5)
+
+    def stop(self):
+        self.is_running = False
+        if self.ws:
+            self.ws.close()
+        logging.info("[Image Thread] 이미지 클라이언트 스레드를 중지합니다.")
+
+
 # --- ROSBridge 클라이언트 스레드 ---
 class RosBridgeClientThread(threading.Thread):
     def __init__(self, socketio_instance):
@@ -40,8 +90,8 @@ class RosBridgeClientThread(threading.Thread):
         self.ros_client = None
         self.is_running = True # 스레드의 실행 상태를 제어하는 플래그를 초기화합니다.
 
-        self.ros_host = '192.168.1.8'
-        self.ros_port = 9090
+        self.ros_host = config.ROS_WEBSOCKET_HOST
+        self.ros_port = config.ROS_WEBSOCKET_PORT
         # robot controll attribute 등록
         self.robot_controller = None
         self.cmd_vel_publisher = None
@@ -140,7 +190,7 @@ class RosBridgeClientThread(threading.Thread):
         """/battery_state 메시지 수신 시 호출"""
         try:
             if 'percentage' in message:
-                robot_status['pi_slam']['battery']['percentage'] = round(message['percentage'] * 100)
+                robot_status['pi_slam']['battery']['percentage'] = round(message['percentage'],1)
             if 'voltage' in message:
                 robot_status['pi_slam']['battery']['voltage'] = round(message['voltage'], 2)
             self.update_web_clients()
@@ -207,13 +257,19 @@ if __name__ == '__main__':
     ros_thread = RosBridgeClientThread(socketio)
     ros_thread.start()
 
-    # 2. Flask-SocketIO 웹 서버 시작
-    logging.info('[Web Server] Flask-SocketIO 서버를 시작합니다. http://0.0.0.0:5001 에서 접속하세요.')
+    # 2. Image 클라이언트 스레드 인스턴스 생성 및 시작
+    image_thread = ImageClientThread(socketio)
+    image_thread.start()
+
+    # 3. Flask-SocketIO 웹 서버 시작
+    logging.info(f'[Web Server] Flask-SocketIO 서버를 시작합니다. http://{config.FLASK_HOST}:{config.FLASK_PORT} 에서 접속하세요.')
     try:
         # use_reloader=False는 백그라운드 스레드가 두 번 실행되는 것을 방지합니다.
         # allow_unsafe_werkzeug=True는 최신 버전의 Flask/Werkzeug에서 필요할 수 있습니다.
-        socketio.run(app, host='0.0.0.0', port=5001, use_reloader=False, debug=False)
+        socketio.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, use_reloader=False, debug=False)
     finally:
-        # 웹 서버가 종료될 때 ROS 스레드도 깔끔하게 종료합니다.
+        # 웹 서버가 종료될 때 스레드도 깔끔하게 종료합니다.
         ros_thread.stop()
         ros_thread.join()
+        image_thread.stop()
+        image_thread.join()
