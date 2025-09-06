@@ -7,11 +7,14 @@
 {% endblock %}
 
 {% block content %}
-<h1>로봇 조종기</h1>
 <div id="status">연결 안됨</div>
 
 <div class="video-container">
-  <img id="video-stream" src="" alt="Pi Camera Stream" style="width: 100%; max-width: 640px; height: auto; border: 1px solid #ccc;"/>
+  <img id="video-stream" src="" alt="Pi Camera Stream"/>
+  <div id="video-overlay">
+    <div class="spinner"></div>
+    <p>연결 시도중...</p>
+  </div>
 </div>
 
 <div class="d-pad">

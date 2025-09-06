@@ -64,7 +64,7 @@ class ImageClientThread(threading.Thread):
                         logging.warning("[Image Thread] 이미지 서버와의 연결이 끊어졌습니다.")
                         break
             except Exception as e:
-                logging.error(f"[Image Thread] 이미지 서버 연결 실패: {e}")
+                logging.info(f"[Image Thread] 이미지 서버에 연결할 수 없습니다.")
 
             robot_status['pi_cv']['connected'] = False
             robot_status['pi_cv']['status'] = "연결 안됨"
@@ -79,7 +79,6 @@ class ImageClientThread(threading.Thread):
         if self.ws:
             self.ws.close()
         logging.info("[Image Thread] 이미지 클라이언트 스레드를 중지합니다.")
-
 
 # --- ROSBridge 클라이언트 스레드 ---
 class RosBridgeClientThread(threading.Thread):
@@ -117,7 +116,7 @@ class RosBridgeClientThread(threading.Thread):
                 logging.info("[ROS Thread] run_forever()가 종료되었습니다.")
 
             except Exception as e:
-                logging.error(f"[ROS Thread] ROS 클라이언트 루프에서 예외 발생: {e}")
+                logging.info(f"[ROS Thread] ROS 브릿지 연결에 실패했습니다.")
 
             # run_forever()가 종료되거나 예외가 발생하면 이 코드가 실행됩니다.
             # 이는 연결이 끊어졌음을 의미합니다.

@@ -4,18 +4,77 @@ body {
     text-align: center;
     background-color: #282c34;
     color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
     height: 100vh;
     margin: 0;
     overflow: hidden; /* 스크롤 방지 */
 }
 
+main {
+    display: flex;
+    flex-direction: column; /* 세로 방향으로 배치 */
+    justify-content: space-around; /* 세로 공간을 균등하게 분배 */
+    align-items: center;    /* 가로축 가운데 정렬 */
+    height: 100%;
+    padding: 20px 0;
+    box-sizing: border-box;
+}
+
 h1 {
-    padding: 13px 0;
-    margin-bottom: 40px;
+    padding: 0;
+    margin: 0;
+}
+
+/* 비디오 컨테이너 */
+.video-container {
+    position: relative; /* 자식 요소를 위한 위치 지정 기준 */
+    width: 100%;
+    max-width: 640px;
+    min-height: 480px; /* 최소 높이 설정 */
+    background-color: #000;
+    border: 1px solid #444;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#video-stream {
+    width: 100%;
+    height: auto;
+    display: block; /* 이미지 하단의 불필요한 여백 제거 */
+    position: relative; /* z-index 적용을 위해 추가 */
+    z-index: 1;         /* 비디오 스트림을 아래에 배치 */
+}
+
+/* 연결 시도 중 오버레이 */
+#video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 1.2em;
+    z-index: 10;        /* 오버레이를 항상 위에 표시 */
+}
+
+/* 로딩 스피너 애니메이션 */
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 4px solid #fff;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* 방향키(D-pad) 레이아웃 - CSS Grid 사용 */
@@ -24,7 +83,6 @@ h1 {
     grid-template-columns: repeat(3, 100px);
     grid-template-rows: repeat(3, 100px);
     gap: 15px; /* 버튼 사이 간격 */
-    align-self: center;
 }
 
 /* 모든 버튼의 공통 스타일 */
@@ -60,7 +118,7 @@ h1 {
 /* 연결 상태 표시 */
 #status {
     position: absolute;
-    top: 80px;
+    top: 95px;
     right: 20px;
     font-size: 1em;
     padding: 8px 15px;

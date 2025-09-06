@@ -128,3 +128,6 @@ venv.bak/
 # gemini env files
 .gemini/
 .github/
+
+#config files
+/web/config.py
