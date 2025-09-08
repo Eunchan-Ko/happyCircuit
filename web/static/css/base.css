@@ -61,8 +61,9 @@ header {
     transition: color 0.3s, text-shadow 0.3s;
 }
 
-.nav-links li a:hover {
-    color: #32cd32; /* 녹색 호버 효과 */
+.nav-links li a:hover,
+.nav-links li a.active {
+    color: #32cd32; /* 녹색 호버/활성 효과 */
     text-shadow: 0 0 8px rgba(50, 205, 50, 0.7);
 }
 
