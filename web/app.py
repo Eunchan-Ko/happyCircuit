@@ -13,6 +13,7 @@ import logging
 import math
 import websocket
 import base64
+import atexit
 
 # --- 설정 파일 로드 ---
 import config
@@ -51,6 +52,7 @@ class ImageClientThread(threading.Thread):
         logging.info("[Image Thread] 이미지 클라이언트 스레드를 시작합니다.")
         while self.is_running:
             try:
+                logging.info("[Image Thread] 새로운 ROS 클라이언트 객체를 생성하고 연결을 시도합니다.")
                 self.ws = websocket.create_connection(f"ws://{self.host}:{self.port}")
                 robot_status['pi_cv']['connected'] = True
                 robot_status['pi_cv']['status'] = "연결됨"
@@ -64,7 +66,7 @@ class ImageClientThread(threading.Thread):
                         logging.warning("[Image Thread] 이미지 서버와의 연결이 끊어졌습니다.")
                         break
             except Exception as e:
-                logging.info(f"[Image Thread] 이미지 서버에 연결할 수 없습니다.")
+                logging.warning(f"[Image Thread] 이미지 서버에 연결할 수 없습니다.")
 
             robot_status['pi_cv']['connected'] = False
             robot_status['pi_cv']['status'] = "연결 안됨"
@@ -101,7 +103,7 @@ class RosBridgeClientThread(threading.Thread):
             try:
                 # --- 매 시도마다 새로운 클라이언트 객체 생성 ---
                 logging.info("[ROS Thread] 새로운 ROS 클라이언트 객체를 생성하고 연결을 시도합니다.")
-                self.ros_client = roslibpy.Ros(host=self.ros_host, port=self.ros_port)
+                self.ros_client = roslibpy.Ros(host=self.ros_host, port=self.ros_port, install_signal_handlers=False)
 
                 # --- 새로운 객체에 이벤트 핸들러 등록 ---
                 self.ros_client.on_ready(self.on_connect)
@@ -218,7 +220,7 @@ class RosBridgeClientThread(threading.Thread):
 
     def stop(self):
         self.is_running = False
-        if self.ros_client.is_connected:
+        if self.ros_client and self.ros_client.is_connected:
             self.ros_client.terminate()
         logging.info("[ROS Thread] ROS 클라이언트 스레드를 중지합니다.")
 
@@ -251,6 +253,23 @@ def handle_drive_command(data):
     elif not ros_thread.robot_controller:
         logging.warning("[Web Server] 로봇 컨트롤러가 준비되지 않아 drive_command를 무시합니다.")
 
+# --- 프로그램 종료 시 실행될 정리(cleanup) 함수 ---
+def cleanup():
+    logging.info("프로그램 종료 시작...")
+    # 1. ROS 스레드 종료
+    if 'ros_thread' in globals() and ros_thread.is_alive():
+        logging.info("ROS 스레드 종료 중...")
+        ros_thread.stop()
+        ros_thread.join() # 스레드가 완전히 끝날 때까지 대기
+    
+    # 2. 이미지 스레드 종료
+    if 'image_thread' in globals() and image_thread.is_alive():
+        logging.info("이미지 스레드 종료 중...")
+        image_thread.stop()
+        image_thread.join() # 스레드가 완전히 끝날 때까지 대기
+
+    logging.info("모든 스레드가 성공적으로 종료되었습니다. 프로그램을 완전히 종료합니다.")
+
 if __name__ == '__main__':
     # 1. RosBridge 클라이언트 스레드 인스턴스 생성 및 시작
     ros_thread = RosBridgeClientThread(socketio)
@@ -260,15 +279,11 @@ if __name__ == '__main__':
     image_thread = ImageClientThread(socketio)
     image_thread.start()
 
-    # 3. Flask-SocketIO 웹 서버 시작
+    # 3. 프로그램 종료 시 cleanup 함수가 실행되도록 등록
+    atexit.register(cleanup)
+
+    # 4. Flask-SocketIO 웹 서버 시작
     logging.info(f'[Web Server] Flask-SocketIO 서버를 시작합니다. http://{config.FLASK_HOST}:{config.FLASK_PORT} 에서 접속하세요.')
-    try:
-        # use_reloader=False는 백그라운드 스레드가 두 번 실행되는 것을 방지합니다.
-        # allow_unsafe_werkzeug=True는 최신 버전의 Flask/Werkzeug에서 필요할 수 있습니다.
-        socketio.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, use_reloader=False, debug=False)
-    finally:
-        # 웹 서버가 종료될 때 스레드도 깔끔하게 종료합니다.
-        ros_thread.stop()
-        ros_thread.join()
-        image_thread.stop()
-        image_thread.join()
+    # use_reloader=False는 백그라운드 스레드가 두 번 실행되는 것을 방지합니다.
+    # allow_unsafe_werkzeug=True는 최신 버전의 Flask/Werkzeug에서 필요할 수 있습니다.
+    socketio.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, use_reloader=False, debug=False)
