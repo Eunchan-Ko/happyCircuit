@@ -1,0 +1,22 @@
+# Mac M4에서 실행할 Mediamtx 최소 설정
+
+# 로그 레벨 (문제가 생기면 debug로 변경)
+logLevel: debug
+
+# RTSP 포트 설정
+protocols:
+  - tcp
+
+rtsp: true
+rtspAddress: :8554
+
+# WebRTC (실시간) 설정
+webrtc: true
+webrtcAddress: :8889
+
+# 스트림 경로 설정
+paths:
+  cam:
+  # 이 'cam'이라는 이름의 경로에는 누구나 스트림을 게시(publish)하고
+  # 읽을(read) 수 있도록 허용합니다.
+  # 복잡한 인증이 필요 없는 내부 네트워크 환경에 적합합니다.
