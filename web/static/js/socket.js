@@ -3,7 +3,8 @@ document.addEventListener('DOMContentLoaded', (event) => {
     // 0. 전역변수 설정
     let isRobotConnected = false;
     const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
-    const statusDiv = document.getElementById('status');
+    const robotStatusDiv = document.getElementById('robot-status');
+    const imageStatusDiv = document.getElementById('image-status');
     const allControlButtons = document.querySelectorAll('.d-pad .button');
     const videoStream = document.getElementById('video-stream');
     const videoOverlay = document.getElementById('video-overlay');
@@ -21,7 +22,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
     // 2. 서버로부터 상태 업데이트를 수신했을 때
     socket.on('status_update', (data) => {
-        isRobotConnected = true;
         console.log('상태 업데이트 수신:', data);
         // 페이지 경로에 따라 적절한 UI 업데이트 함수 호출
         if (document.querySelector('.home-container')) {
@@ -149,20 +149,31 @@ document.addEventListener('DOMContentLoaded', (event) => {
     function updateControlPageUI(data) {
         // 전역 isRobotConnected 변수 업데이트
         isRobotConnected = data.pi_slam && data.pi_slam.rosbridge_connected;
+        const isCvConnected = data.pi_cv && data.pi_cv.connected;
+        console.log('Updating control page UI. Robot connected:', isRobotConnected, 'CV connected:', isCvConnected);
 
-        // control.html의 연결 상태 표시 (statusDiv)
-        if (statusDiv) {
+        // control.html의 연결 상태 표시
+        if (robotStatusDiv) {
             if (isRobotConnected) {
-                statusDiv.textContent = '연결됨';
-                statusDiv.style.backgroundColor = '#28a745';
+                robotStatusDiv.textContent = 'ROBOT: 연결됨';
+                robotStatusDiv.style.color = '#28a745';
             } else {
-                statusDiv.textContent = '연결 안됨';
-                statusDiv.style.backgroundColor = '#dc3545';
+                robotStatusDiv.textContent = 'ROBOT: 연결 안됨';
+                robotStatusDiv.style.color = '#dc3545';
+            }
+        }
+
+        if (imageStatusDiv) {
+            if (isCvConnected) {
+                imageStatusDiv.textContent = 'IMAGE: 연결됨';
+                imageStatusDiv.style.color = '#28a745';
+            } else {
+                imageStatusDiv.textContent = 'IMAGE: 연결 안됨';
+                imageStatusDiv.style.color = '#dc3545';
             }
         }
 
         // 비디오 UI 업데이트
-        const isCvConnected = data.pi_cv && data.pi_cv.connected;
         if (videoStream) {
             // control.html 에서는 data.image가 아닌 new_image 이벤트를 통해 이미지를 받습니다.
             // 이 부분은 new_image 이벤트 핸들러에서 처리해야 합니다.
@@ -281,6 +292,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     });
 
     // 페이지 로드 시 초기 UI 상태 설정
-    updateVideoUI(false);
+    //updateVideoUI(false);
 });
 

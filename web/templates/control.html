@@ -7,7 +7,9 @@
 {% endblock %}
 
 {% block content %}
-<div id="status">연결 안됨</div>
+<div class="control-container">
+<div id="robot-status">ROBOT: 연결 안됨</div>
+<div id="image-status">IMAGE: 연결 안됨</div>
 
 <div class="video-container">
   <img id="video-stream" src="" alt="Pi Camera Stream"/>
@@ -23,6 +25,7 @@
   <div id="stop" class="button stop">■</div>
   <div id="right" class="button right">→</div>
   <div id="backward" class="button backward">↓</div>
+</div>
 </div>
 {% endblock %}
 

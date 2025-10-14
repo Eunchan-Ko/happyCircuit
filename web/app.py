@@ -7,10 +7,10 @@ from flask_socketio import SocketIO
 from control.routes import control_bp
 from disconnection_check.routes import disconnection_check_bp
 from control.robot_controller import SmoothRobotController
+
 import roslibpy
 import threading
 import logging
-import math
 import websocket
 import base64
 import atexit
@@ -80,7 +80,7 @@ class ImageClientThread(threading.Thread):
     def run(self):
         # 변수 설정
         frame_counter = 0
-        inference_interval = 3
+        inference_interval = 1
         logging.info("[Image Thread] 이미지 클라이언트 스레드를 시작합니다.")
         while self.is_running:
             try:
@@ -103,6 +103,7 @@ class ImageClientThread(threading.Thread):
 
                         # 3. 3프레임마다 이미지 처리 및 YOLO 추론
                         if frame_counter % inference_interval == 0:
+                            frame_counter = 0
                             try:
                                 # Base64 -> Numpy Array -> OpenCV Image
                                 img_bytes = base64.b64decode(b64_image)
@@ -149,6 +150,7 @@ class ImageClientThread(threading.Thread):
             robot_status['pi_cv']['connected'] = False
             robot_status['pi_cv']['status'] = "연결 안됨"
             robot_status['pi_cv']['damage_detected'] = None # 연결 끊김 시 None으로 초기화
+            logging.info("[Image Thread] 클라이언트에 연결 끊김 상태 전송.")
             self.socketio.emit('status_update', robot_status)
             
             if self.is_running:
@@ -280,6 +282,12 @@ class RosBridgeClientThread(threading.Thread):
     def on_close_handler(self, proto=None):
         """roslibpy가 'close' 이벤트를 감지했을 때 호출될 콜백"""
         logging.warning("[ROS Thread] roslibpy가 'close' 이벤트를 감지했습니다.")
+        robot_status['pi_slam']['rosbridge_connected'] = False
+        robot_status['pi_slam']['battery']['percentage'] = "N/A"
+        robot_status['pi_slam']['battery']['voltage'] = "N/A"
+        robot_status['pi_slam']['last_odom']['x'] = 0
+        robot_status['pi_slam']['last_odom']['y'] = 0
+        robot_status['pi_slam']['last_odom']['theta'] = 0
 
     def on_error_handler(self, error):
         """roslibpy가 'error' 이벤트를 감지했을 때 호출될 콜백"""
@@ -330,6 +338,7 @@ def handle_drive_command(data):
     # 컨트롤러가 생성되었고(즉, ROS가 연결됨), 방향 값이 있을 때만 실행
     if ros_thread.robot_controller and direction:
         ros_thread.robot_controller.set_direction(direction)
+        logging.info(f"[Web Server] 로봇 컨트롤중 (direction: \"{direction}\")")
     elif not ros_thread.robot_controller:
         logging.warning("[Web Server] 로봇 컨트롤러가 준비되지 않아 drive_command를 무시합니다.")
 

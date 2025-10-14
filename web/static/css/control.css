@@ -10,13 +10,18 @@ body {
 }
 
 main {
+    height: 100%;
+    padding: 20px 0;
+    box-sizing: border-box;
+}
+
+.control-container {
     display: flex;
     flex-direction: column; /* 세로 방향으로 배치 */
     justify-content: space-around; /* 세로 공간을 균등하게 분배 */
     align-items: center;    /* 가로축 가운데 정렬 */
     height: 100%;
-    padding: 20px 0;
-    box-sizing: border-box;
+
 }
 
 h1 {
@@ -83,6 +88,7 @@ h1 {
     grid-template-columns: repeat(3, 100px);
     grid-template-rows: repeat(3, 100px);
     gap: 15px; /* 버튼 사이 간격 */
+    padding: 20px 0 0 0;
 }
 
 /* 모든 버튼의 공통 스타일 */
@@ -116,15 +122,22 @@ h1 {
 .backward { grid-column: 2; grid-row: 3; }
 
 /* 연결 상태 표시 */
-#status {
+#robot-status, #image-status {
     position: absolute;
-    top: 95px;
-    right: 20px;
     font-size: 1em;
     padding: 8px 15px;
     border-radius: 10px;
-    background-color: #dc3545; /* 기본은 '연결 안됨' 색상 */
-    transition: background-color 0.5s;
+    background-color: #444;
+}
+
+#robot-status {
+    top: 95px;
+    right: 20px;
+}
+
+#image-status {
+    top: 140px;
+    right: 20px;
 }
 
 .button.active-command {
@@ -135,4 +148,23 @@ h1 {
 /* 정지 버튼은 활성화될 때 다른 색을 갖도록 별도 지정 */
 .stop.button.active-command {
     background-color: #e04b4b; /* 더 진한 빨간색 */
+}
+
+@media (max-width: 1000px) {
+    .control-container {
+        justify-content: center;
+    }
+
+    #robot-status, #image-status {
+        position: relative;
+        top: auto;
+        right: auto;
+        margin-top: 10px;
+    }
+
+    .d-pad {
+        grid-template-columns: repeat(3, 80px);
+        grid-template-rows: repeat(3, 80px);
+        gap: 10px;
+    }
 }
