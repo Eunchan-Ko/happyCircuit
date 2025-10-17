@@ -1,3 +1,6 @@
+# --- 설정 파일 로드 ---
+import config
+
 # 비동기 처리를 위해 eventlet 패치
 import eventlet
 eventlet.monkey_patch()
@@ -15,17 +18,20 @@ import websocket
 import base64
 import atexit
 import torch
+import json
+import os
+from datetime import datetime
+
+# --- 이미지 저장 경로 설정 ---
+IMAGE_STORAGE_ROOT = os.path.join(os.path.dirname(__file__), 'static', 'imgs', 'line_crash')
+os.makedirs(IMAGE_STORAGE_ROOT, exist_ok=True)
+logging.info(f"[File] 이미지 저장 경로 확인: {IMAGE_STORAGE_ROOT}")
 
 # --- 추가된 라이브러리 ---
 from ultralytics import YOLO
 import cv2
 import numpy as np
 
-# --- 설정 파일 로드 ---
-import config
-
-# 로깅 설정
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
 # --- Flask 및 SocketIO 앱 초기화 ---
 app = Flask(__name__)
@@ -36,6 +42,22 @@ app.register_blueprint(disconnection_check_bp)
 app.config['SECRET_KEY'] = 'secret!'
 # 모든 출처에서의 연결을 허용합니다 (개발용).
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+# --- MongoDB 설정 ---
+try:
+    # config.py에 정의된 MONGODB_CLIENT를 사용
+    mongo_client = config.MONGODB_CLIENT
+    db = mongo_client.happy_circuit_db # 데이터베이스 선택
+    warnings_collection = db.warnings # 컬렉션 선택
+    # 위치 기반 중복 저장을 방지하기 위해 2dsphere 인덱스 생성
+    warnings_collection.create_index([("location", "2dsphere")])
+    logging.info("[DB] MongoDB에 성공적으로 연결 및 'warnings' 컬렉션과 인덱스 준비 완료.")
+except AttributeError:
+    logging.error("[DB] 'config.py'에 'MONGODB_CLIENT'가 정의되지 않았습니다. DB 관련 기능이 비활성화됩니다.")
+    warnings_collection = None
+except Exception as e:
+    logging.error(f"[DB] MongoDB 연결 또는 설정 실패: {e}")
+    warnings_collection = None
 
 # --- YOLO 모델 로드 및 설정 ---
 if torch.backends.mps.is_available():
@@ -93,10 +115,18 @@ class ImageClientThread(threading.Thread):
                 
                 while self.is_running:
                     try:
-                        # 1. 원본 이미지(base64) 수신
-                        b64_image = self.ws.recv()
+                        # 1. 원본 메시지(JSON) 수신
+                        raw_message = self.ws.recv()
+                        # 2. JSON 파싱하여 이미지 데이터(base64) 추출
+                        try:
+                            data = json.loads(raw_message)
+                            b64_image = data['image']
+                        except (json.JSONDecodeError, KeyError) as e:
+                            logging.warning(f"[Image Thread] 수신한 데이터가 올바른 JSON 형식이 아닙니다: {e}")
+                            continue # 다음 프레임으로 넘어감
+
                         frame_counter += 1
-                        # 2. YOLO 모델이 없으면 원본 이미지만 전송
+                        # 3. YOLO 모델이 없으면 원본 이미지만 전송
                         if not yolo_model:
                             self.socketio.emit('new_image', {'image': b64_image})
                             continue
@@ -111,6 +141,11 @@ class ImageClientThread(threading.Thread):
                                 cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
                                 # YOLO 추론 실행
+                                # cv_image가 None이 아닌 경우에만 추론을 실행합니다.
+                                if cv_image is None:
+                                    logging.warning("[Image Thread] 이미지 디코딩 실패, 현재 프레임을 건너뜁니다.")
+                                    self.socketio.emit('new_image', {'image': b64_image}) # 원본(아마도 손상된) 이미지를 전송
+                                    continue
                                 results = yolo_model(cv_image, imgsz=config.YOLO_IMG_SIZE, conf=config.YOLO_CONF_THRES, verbose=False)
 
                                 # 추론 결과(bounding box)를 원본 이미지에 그리기
@@ -118,10 +153,115 @@ class ImageClientThread(threading.Thread):
 
                                 # 'damage' 클래스 검출 여부 확인
                                 damage_detected = False
+                                detected_boxes = []
                                 for box in results[0].boxes:
                                     if int(box.cls) in damage_class_idxs:
                                         damage_detected = True
-                                        break
+                                        detected_boxes.append({
+                                            'class_id': int(box.cls),
+                                            'class_name': yolo_names.get(int(box.cls), 'Unknown'),
+                                            'confidence': float(box.conf),
+                                            'box_coords': box.xyxyn.cpu().numpy().tolist() # 정규화된 좌표
+                                        })
+
+                                # Bounding Box가 그려진 이미지를 Base64로 인코딩
+                                _, buffer = cv2.imencode('.jpg', annotated_image)
+                                annotated_b64_image = base64.b64encode(buffer).decode('utf-8')
+
+                                # damage가 검출되면 DB에 저장 (위치 중복 확인 포함)
+                                if damage_detected and warnings_collection is not None:
+                                    try:
+                                        # 1. 현재 로봇의 odom 데이터 가져오기
+                                        current_odom = robot_status['pi_slam']['last_odom']
+                                        odom_x = current_odom.get('x')
+                                        odom_y = current_odom.get('y')
+
+                                        # 2. odom 데이터가 유효한 숫자인지 확인
+                                        if isinstance(odom_x, (int, float)) and isinstance(odom_y, (int, float)):
+                                            # 3. 현재 위치 근처에 이미 저장된 경고가 있는지 확인 (50cm 반경)
+                                            min_distance_meters = 0.5
+                                            
+                                            query = {
+                                                "location": {
+                                                    "$near": {
+                                                        "$geometry": {
+                                                            "type": "Point",
+                                                            "coordinates": [odom_x, odom_y]
+                                                        },
+                                                        "$maxDistance": min_distance_meters
+                                                    }
+                                                }
+                                            }
+                                            existing_warning = warnings_collection.find_one(query)
+
+                                            if existing_warning:
+                                                logging.info(f"[DB] 현재 위치 ({odom_x:.2f}, {odom_y:.2f}) 근처에 이미 경고가 저장되어 있어 중복 저장을 건너뜁니다.")
+                                            else:
+                                                # 4. 중복이 아니면 이미지 파일로 저장하고 DB에는 경로를 저장
+                                                timestamp = datetime.utcnow()
+                                                ts_str = timestamp.strftime('%Y%m%d_%H%M%S_%f')
+                                                class_names = '-'.join(sorted(list(set(d['class_name'] for d in detected_boxes)))) or 'detection'
+                                                filename = f"{ts_str}_{class_names}.jpg"
+                                                
+                                                # web/static/imgs/line_crash/filename.jpg
+                                                absolute_path = os.path.join(IMAGE_STORAGE_ROOT, filename)
+                                                
+                                                # 이미지 파일 저장
+                                                cv2.imwrite(absolute_path, annotated_image)
+                                                
+                                                # DB에 저장할 문서
+                                                doc = {
+                                                    "timestamp": timestamp,
+                                                    "odom": current_odom,
+                                                    "location": {"type": "Point", "coordinates": [odom_x, odom_y]},
+                                                    "detections": detected_boxes,
+                                                    "image_path": os.path.join('imgs', 'line_crash', filename) # 웹에서 접근할 경로
+                                                }
+                                                warnings_collection.insert_one(doc)
+                                                logging.info(f"[DB] 손상 감지: 새로운 위치({odom_x:.2f}, {odom_y:.2f})의 경고를 DB에 저장했습니다 (이미지: {filename}).")
+                                        else:
+                                            # odom 데이터가 유효하지 않을 경우, 시간 기반으로 중복 저장 방지
+                                            na_save_interval_seconds = 10 # 최소 저장 간격 (초)
+                                            
+                                            # 'location' 필드가 없는 가장 최근 문서를 찾음
+                                            last_na_warning = warnings_collection.find_one(
+                                                {"location": {"$exists": False}},
+                                                sort=[('timestamp', -1)]
+                                            )
+                                            
+                                            should_save = True
+                                            if last_na_warning:
+                                                time_since_last = datetime.utcnow() - last_na_warning['timestamp']
+                                                if time_since_last.total_seconds() < na_save_interval_seconds:
+                                                    should_save = False
+                                                    logging.info(f"[DB] Odom N/A 상태. 마지막 저장 후 {time_since_last.total_seconds():.1f}초 경과. {na_save_interval_seconds}초 내 중복 저장을 방지합니다.")
+
+                                            if should_save:
+                                                logging.warning("[DB] Odom 데이터가 유효하지 않아 시간 간격에 따라 경고를 저장합니다.")
+                                                
+                                                # 이미지 파일로 저장하고 DB에는 경로를 저장
+                                                timestamp = datetime.utcnow()
+                                                ts_str = timestamp.strftime('%Y%m%d_%H%M%S_%f')
+                                                class_names = '-'.join(sorted(list(set(d['class_name'] for d in detected_boxes)))) or 'detection'
+                                                filename = f"{ts_str}_{class_names}.jpg"
+                                                
+                                                absolute_path = os.path.join(IMAGE_STORAGE_ROOT, filename)
+                                                
+                                                # 이미지 파일 저장
+                                                cv2.imwrite(absolute_path, annotated_image)
+                                                
+                                                # DB에 저장할 문서
+                                                doc = {
+                                                    "timestamp": timestamp,
+                                                    "odom": current_odom, # "N/A" 등 비정상 데이터라도 일단 기록
+                                                    "detections": detected_boxes,
+                                                    "image_path": os.path.join('imgs', 'line_crash', filename) # 웹에서 접근할 경로
+                                                }
+                                                warnings_collection.insert_one(doc)
+                                                logging.info(f"[DB] Odom N/A. 경고를 DB에 저장했습니다 (이미지: {filename}).")
+
+                                    except Exception as e:
+                                        logging.error(f"[DB] 경고 데이터를 MongoDB에 저장하는 중 오류 발생: {e}")
 
                                 # 상태가 변경되었을 때만 업데이트 및 전송
                                 if robot_status['pi_cv']['damage_detected'] != damage_detected:
@@ -129,8 +269,6 @@ class ImageClientThread(threading.Thread):
                                     self.socketio.emit('status_update', robot_status)
 
                                 # Bounding Box가 그려진 이미지를 Base64로 인코딩하여 전송
-                                _, buffer = cv2.imencode('.jpg', annotated_image)
-                                annotated_b64_image = base64.b64encode(buffer).decode('utf-8')
                                 self.socketio.emit('new_image', {'image': annotated_b64_image})
 
                             except Exception as e:
@@ -288,6 +426,10 @@ class RosBridgeClientThread(threading.Thread):
         robot_status['pi_slam']['last_odom']['x'] = 0
         robot_status['pi_slam']['last_odom']['y'] = 0
         robot_status['pi_slam']['last_odom']['theta'] = 0
+        
+        # run_forever()를 중지시켜서 직접 만든 재연결 루프가 동작하게 함
+        if self.ros_client:
+            self.ros_client.terminate()
 
     def on_error_handler(self, error):
         """roslibpy가 'error' 이벤트를 감지했을 때 호출될 콜백"""

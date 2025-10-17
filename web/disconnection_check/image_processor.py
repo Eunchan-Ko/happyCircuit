@@ -6,7 +6,7 @@ import base64
 
 # Path to your NCNN YOLO model
 # Ensure this path is correct for your local server setup
-MODEL_PATH = "/Users/go-eunchan/HappyCircuit/openCV/best_reversion_ncnn_model"
+MODEL_PATH = "/Users/go-eunchan/HappyCircuit/openCV/best_updated.pt"
 
 # Load the YOLO model
 try:
