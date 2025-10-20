@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, jsonify, current_app
 import os
 import json
 
-map_bp = Blueprint('map_viewer', __name__)
+map_viewer_bp = Blueprint('map_viewer', __name__)
 
 # ✨ 이 라우트가 /map URL을 처리하도록 수정합니다.
 @map_bp.route('/map')

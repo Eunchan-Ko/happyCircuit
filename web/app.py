@@ -15,6 +15,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO
 from web.control.routes import control_bp
 from web.disconnection_check.routes import disconnection_check_bp
+from web.map_viewer.routes import map_viewer_bp
 
 import logging
 import atexit
@@ -35,7 +36,7 @@ app = Flask(__name__)
 # --- Flask 앱에 /control 루트 추가 ---
 app.register_blueprint(control_bp)
 app.register_blueprint(disconnection_check_bp)
-app.register_blueprint(map_bp)
+app.register_blueprint(map_viewer_bp)
 # secret_key는 SocketIO에 필요할 수 있습니다.
 app.config['SECRET_KEY'] = 'secret!'
 # 모든 출처에서의 연결을 허용합니다 (개발용).
