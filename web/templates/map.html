@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}SLAM 맵 - HappyCircuit{% endblock %}
+
+{% block styles %}
+{# (선택 사항) 지도 페이지에만 적용할 별도의 CSS가 있다면 여기에 연결합니다. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="map-container">
+    <div class="map-header">
+        <h1>실시간 SLAM 지도</h1>
+        <p>로봇이 생성하는 주변 환경 지도를 실시간으로 확인합니다.</p>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="mapCanvas"></canvas>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{# 이 페이지에서만 사용할 지도 렌더링 전용 JavaScript 파일을 로드합니다. #}
+<script src="{{ url_for('static', filename='js/map_renderer.js') }}"></script>
+{% endblock %}
