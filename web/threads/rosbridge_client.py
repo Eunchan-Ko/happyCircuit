@@ -70,6 +70,11 @@ class RosBridgeClientThread(threading.Thread):
         battery_listener.subscribe(self.battery_callback)
         logging.info("[ROS Thread] '/battery_state' 토픽 구독 설정 완료.")
 
+        # 지도 토픽 구독
+        map_listener = roslibpy.Topic(self.ros_client, '/map', 'nav_msgs/OccupancyGrid')
+        map_listener.subscribe(self.map_callback)
+        logging.info("[ROS Thread] '/map' 토픽 구독 설정 완료.")
+
         # ✅ 제어를 위한 퍼블리셔 생성
         self.cmd_vel_publisher = roslibpy.Topic(
             self.ros_client,
@@ -121,6 +126,30 @@ class RosBridgeClientThread(threading.Thread):
             self.update_web_clients()
         except Exception as e:
             logging.error(f"Battery callback error: {e}")
+
+    def map_callback(self, message):
+        """/map 토픽에서 메시지를 수신할 때마다 호출됩니다."""
+        try:
+            # nav_msgs/OccupancyGrid 메시지에서 필요한 정보 추출
+            width = message['info']['width']
+            height = message['info']['height']
+            data = message['data']
+
+            # 프론트엔드로 보낼 데이터 구성
+            map_data = {
+                'width': width,
+                'height': height,
+                'data': data
+            }
+            
+            # 'map_update' 이벤트로 웹 클라이언트에 데이터 전송
+            self.socketio.emit('map_update', map_data)
+            # logging.info("[ROS Thread] /map 메시지 수신 및 클라이언트로 전송 완료.") # 너무 자주 출력되므로 주석 처리
+        except KeyError as e:
+            logging.warning(f"[ROS Thread] 수신한 map 메시지에 예상 키가 없습니다: {e}")
+        except Exception as e:
+            logging.error(f"[ROS Thread] map_callback에서 에러: {e}")
+
     def on_close_handler(self, proto=None):
         """roslibpy가 'close' 이벤트를 감지했을 때 호출될 콜백"""
         logging.warning("[ROS Thread] roslibpy가 'close' 이벤트를 감지했습니다.")

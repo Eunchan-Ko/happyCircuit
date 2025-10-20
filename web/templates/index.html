@@ -26,9 +26,9 @@
             <p>이미지를 분석하여 케이블의 단선 여부를 확인합니다.</p>
         </a>
 
-        <a href="#" class="card disabled">
+        <a href="{{ url_for('map_viewer.show_map_page') }}" class="card">
             <div class="card-icon">🗺️</div>
-            <h2>SLAM 맵 (준비중)</h2>
+            <h2>SLAM 맵</h2>
             <p>실시간으로 생성되는 로봇의 주변 환경 지도를 확인합니다.</p>
         </a>
     </div>
@@ -66,5 +66,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/socket.js') }}"></script>
 {% endblock %}
