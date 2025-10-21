@@ -1,13 +1,35 @@
-// DOM이 완전히 로드된 후에 스크립트가 실행되도록 하는 것이 안전합니다.
+// 1. 소켓을 전역 변수로 선언하고 즉시 연결합니다.
+// 이렇게 하면 다른 스크립트 파일에서도 이 소켓 인스턴스를 참조할 수 있습니다.
+const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+
+// 2. DOM이 완전히 로드된 후에 DOM 요소에 접근하고 이벤트 리스너를 등록합니다.
 document.addEventListener('DOMContentLoaded', (event) => {
-    // 0. 전역변수 설정
+    // 전역변수 설정
     let isRobotConnected = false;
-    const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
     const robotStatusDiv = document.getElementById('robot-status');
     const imageStatusDiv = document.getElementById('image-status');
     const allControlButtons = document.querySelectorAll('.d-pad .button');
     const videoStream = document.getElementById('video-stream');
     const videoOverlay = document.getElementById('video-overlay');
+
+    /**
+     * =======================================
+     *           페이지별 초기화
+     * =======================================
+     */
+
+    // 수동 조작 페이지에만 해당하는 로직
+    if (document.querySelector('.control-container')) {
+        // 1. 서버에 제어 페이지 접속을 알림
+        socket.emit('entered_control_page');
+        console.log("서버에 'entered_control_page' 이벤트를 전송했습니다.");
+
+        // 2. 사용자가 페이지를 벗어날 때 서버에 알림
+        window.addEventListener('beforeunload', () => {
+            socket.emit('left_control_page');
+            console.log("서버에 'left_control_page' 이벤트를 전송했습니다.");
+        });
+    }
 
     /**
      * =======================================
@@ -22,7 +44,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
     // 2. 서버로부터 상태 업데이트를 수신했을 때
     socket.on('status_update', (data) => {
-        console.log('상태 업데이트 수신:', data);
+        //console.log('상태 업데이트 수신:', data);
         // 페이지 경로에 따라 적절한 UI 업데이트 함수 호출
         if (document.querySelector('.home-container')) {
             updateIndexPageUI(data);

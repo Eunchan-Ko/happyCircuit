@@ -14,6 +14,8 @@ import torch
 
 import config
 
+from web.config import DB_connect
+
 # --- YOLO 모델 로드 및 설정 ---
 if torch.backends.mps.is_available():
     device = torch.device("mps")
@@ -123,7 +125,7 @@ class ImageClientThread(threading.Thread):
                                 annotated_b64_image = base64.b64encode(buffer).decode('utf-8')
 
                                 # damage가 검출되면 DB에 저장 (위치 중복 확인 포함)
-                                if damage_detected and self.warnings_collection is not None:
+                                if DB_connect and damage_detected and self.warnings_collection is not None:
                                     logging.info("[Image Thread] warning class를 검출했습니다. DB에 이미지 저장을 시도합니다.")
                                     try:
                                         # 1. 현재 로봇의 odom 데이터 가져오기

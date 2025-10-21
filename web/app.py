@@ -1,6 +1,8 @@
 import sys
 import os
 
+from web.config import DB_connect
+
 # 프로젝트 루트 디렉토리를 Python 경로에 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -11,7 +13,7 @@ import config
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Flask, render_template
+from flask import Flask, render_template, session
 from flask_socketio import SocketIO
 from web.control.routes import control_bp
 from web.disconnection_check.routes import disconnection_check_bp
@@ -43,27 +45,31 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- MongoDB 설정 ---
-try:
-    # config.py에 정의된 MONGODB_CLIENT를 사용
-    mongo_client = config.MONGODB_CLIENT
-    db = mongo_client.happy_circuit_db # 데이터베이스 선택
-    warnings_collection = db.warnings # 컬렉션 선택
-    # 위치 기반 중복 저장을 방지하기 위해 2dsphere 인덱스 생성
-    warnings_collection.create_index([("location", "2dsphere")])
-    logging.info("[DB] MongoDB에 성공적으로 연결 및 'warnings' 컬렉션과 인덱스 준비 완료.")
-except AttributeError:
-    logging.error("[DB] 'config.py'에 'MONGODB_CLIENT'가 정의되지 않았습니다. DB 관련 기능이 비활성화됩니다.")
-    warnings_collection = None
-except Exception as e:
-    logging.error(f"[DB] MongoDB 연결 또는 설정 실패: {e}")
-    warnings_collection = None
-
+if DB_connect:
+    try:
+        # config.py에 정의된 MONGODB_CLIENT를 사용
+        mongo_client = config.MONGODB_CLIENT
+        db = mongo_client.happy_circuit_db # 데이터베이스 선택
+        warnings_collection = db.warnings # 컬렉션 선택
+        # 위치 기반 중복 저장을 방지하기 위해 2dsphere 인덱스 생성
+        warnings_collection.create_index([("location", "2dsphere")])
+        logging.info("[DB] MongoDB에 성공적으로 연결 및 'warnings' 컬렉션과 인덱스 준비 완료.")
+    except AttributeError:
+        logging.error("[DB] 'config.py'에 'MONGODB_CLIENT'가 정의되지 않았습니다. DB 관련 기능이 비활성화됩니다.")
+        warnings_collection = None
+    except Exception as e:
+        logging.error(f"[DB] MongoDB 연결 또는 설정 실패: {e}")
+        warnings_collection = None
+warnings_collection = None
 
 # 로봇의 현재 상태를 저장할 전역 변수 (상태 저장소)
 robot_status = {
     "pi_cv": { "connected": False, "status": "연결 안됨", "damage_detected": None }, # YOLO 결과 저장을 위해 damage_detected 추가
     "pi_slam": { "rosbridge_connected": False, "last_odom": { "x": "N/A", "y": "N/A", "theta": "N/A" }, "battery":{"percentage":"N/A", "voltage":"N/A"} }
 }
+
+# 수동 조작 페이지에 접속한 사용자 수를 추적하는 카운터
+control_page_active_users = 0
 
 
 # --- Flask 라우트 및 SocketIO 이벤트 핸들러 ---
@@ -83,7 +89,47 @@ def handle_web_client_connect():
 @socketio.on('disconnect')
 def handle_web_client_disconnect():
     """웹 클라이언트의 연결이 끊어졌을 때 호출됩니다."""
+    global control_page_active_users
     logging.info("[Web Server] 클라이언트 연결 끊어짐")
+    # 세션에 'on_control_page' 플래그가 있는지 확인하여, 제어 페이지에 있던 사용자인지 식별
+    if session.get('on_control_page', False):
+        control_page_active_users = max(0, control_page_active_users - 1)
+        logging.info(f"[Web Server] 제어 페이지 사용자 감소. 현재 사용자: {control_page_active_users}")
+        if control_page_active_users == 0:
+            logging.info("[Web Server] 제어 페이지 사용자가 없으므로 로봇 컨트롤러를 비활성화합니다.")
+            if ros_thread and ros_thread.robot_controller:
+                ros_thread.deactivate_controller()
+
+# 제어 페이지에 사용자가 접속했을 때 호출됩니다.
+@socketio.on('entered_control_page')
+def handle_entered_control_page():
+    """수동 조작 페이지에 사용자가 접속했을 때 호출됩니다."""
+    global control_page_active_users
+    # 세션에 플래그를 설정하여, 이 사용자가 제어 페이지에 있음을 기억합니다.
+    if not session.get('on_control_page', False):
+        session['on_control_page'] = True
+        control_page_active_users += 1
+        logging.info(f"[Web Server] 제어 페이지 사용자 증가. 현재 사용자: {control_page_active_users}")
+        # 첫 사용자가 접속한 경우 컨트롤러를 활성화합니다.
+        if control_page_active_users == 1:
+            logging.info("[Web Server] 첫 제어 페이지 사용자 접속. 로봇 컨트롤러를 활성화합니다.")
+            if ros_thread and ros_thread.robot_controller:
+                ros_thread.activate_controller()
+
+# 사용자가 제어 페이지를 벗어났을 때 호출됩니다.
+@socketio.on('left_control_page')
+def handle_left_control_page():
+    """사용자가 수동 조작 페이지를 벗어났을 때 호출됩니다."""
+    global control_page_active_users
+    if session.get('on_control_page', False):
+        session['on_control_page'] = False
+        control_page_active_users = max(0, control_page_active_users - 1)
+        logging.info(f"[Web Server] 제어 페이지 사용자 감소. 현재 사용자: {control_page_active_users}")
+        # 마지막 사용자가 나간 경우 컨트롤러를 비활성화합니다.
+        if control_page_active_users == 0:
+            logging.info("[Web Server] 제어 페이지 사용자가 없으므로 로봇 컨트롤러를 비활성화합니다.")
+            if ros_thread and ros_thread.robot_controller:
+                ros_thread.deactivate_controller()
 
 # 웹 클라이언트에서 drive 명령을 입력했을 때 호출됩니다.
 @socketio.on('drive_command')
