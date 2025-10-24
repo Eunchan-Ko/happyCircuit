@@ -61,7 +61,7 @@ class ImageClientThread(threading.Thread):
         while self.is_running:
             try:
                 logging.info("[Image Thread] 이미지 서버에 연결을 시도합니다...")
-                self.ws = websocket.create_connection(f"ws://{self.host}:{self.port}")
+                self.ws = websocket.create_connection(f"ws://{self.host}:{self.port}", timeout=5)
                 self.robot_status['pi_cv']['connected'] = True
                 self.robot_status['pi_cv']['status'] = "연결됨"
                 self.socketio.emit('status_update', self.robot_status)
@@ -108,10 +108,11 @@ class ImageClientThread(threading.Thread):
                                 # 'damage' 클래스 검출 여부 확인
                                 damage_detected = False
                                 detected_boxes = []
+                                # object class 검출시 사진 분석 후 DB 저장
                                 for box in results[0].boxes:
-                                    logging.info("[Image Thread] Data Analysising")
+                                    # logging.info("[Image Thread] Data Analysising")
                                     if int(box.cls) in damage_class_idxs:
-                                        logging.info("[Image Thread] Damage Detected")
+                                        # logging.info("[Image Thread] Damage Detected")
                                         damage_detected = True
                                         detected_boxes.append({
                                             'class_id': int(box.cls),
@@ -234,6 +235,9 @@ class ImageClientThread(threading.Thread):
                                 self.socketio.emit('new_image', {'image': b64_image})
                         else:
                             self.socketio.emit('new_image', {'image': b64_image})
+                    except websocket.WebSocketTimeoutException:
+                        logging.warning("[Image Thread] 이미지 서버로부터 데이터 수신 시간 초과. 연결을 재설정합니다.")
+                        break
                     except websocket.WebSocketConnectionClosedException:
                         logging.warning("[Image Thread] 이미지 서버와의 연결이 끊어졌습니다.")
                         break # 내부 루프를 빠져나가 재연결 로직으로 이동

@@ -15,6 +15,8 @@ eventlet.monkey_patch()
 
 from flask import Flask, render_template, session
 from flask_socketio import SocketIO
+
+# --- 페이지 display
 from web.control.routes import control_bp
 from web.disconnection_check.routes import disconnection_check_bp
 from web.map_viewer.routes import map_bp
