@@ -12,6 +12,7 @@
     <div class="map-header">
         <h1>실시간 SLAM 지도</h1>
         <p>로봇이 생성하는 주변 환경 지도를 실시간으로 확인합니다.</p>
+        <button id="startExplorationBtn" class="btn btn-primary">탐사 시작</button>
     </div>
 
     <div class="canvas-wrapper">
@@ -23,4 +24,10 @@
 {% block scripts %}
 {# 이 페이지에서만 사용할 지도 렌더링 전용 JavaScript 파일을 로드합니다. #}
 <script src="{{ url_for('static', filename='js/map_renderer.js') }}"></script>
+<script>
+    document.getElementById('startExplorationBtn').addEventListener('click', () => {
+        console.log('탐사 시작 버튼 클릭됨');
+        socket.emit('start_exploration');
+    });
+</script>
 {% endblock %}

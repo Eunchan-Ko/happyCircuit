@@ -13,19 +13,20 @@ import subprocess
 import tf2_ros
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
 from tf_transformations import euler_from_quaternion
+from std_msgs.msg import String # 추가
 
 class ExplorerNode(Node):
     def __init__(self):
         super().__init__('explorer')
         self.get_logger().info("Explorer Node Started")
 
-        # --- \uc0c1\ud0dc \uad00\ub9ac \ubcc0\uc218 ---
-        # 'EXPLORING': \ud0d0\uc0c9 \uc911
-        # 'RETURNING_HOME': \uc2dc\uc791 \uc9c0\uc810\uc73c\ub85c \ubcf5\uadc0 \uc911
-        # 'SHUTTING_DOWN': \uc885\ub8cc \uc911
+        # --- 상태 관리 변수 ---
+        # 'EXPLORING': 탐색 중
+        # 'RETURNING_HOME': 시작 지점으로 복귀 중
+        # 'SHUTTING_DOWN': 종료 중
         self.state = 'EXPLORING'
         self.get_logger().info(f"Initial Setting. state : EXPLORING")
-        self.start_position = None # \ud0d0\uc0c9 \uc2dc\uc791 \uc704\uce58\ub97c \uc800\uc7a5\ud560 \ubcc0\uc218
+        self.start_position = None # 탐색 시작 위치를 저장할 변수
         self.frontier_failure_count = 0
 
         # Subscriber to the map topic
@@ -34,6 +35,9 @@ class ExplorerNode(Node):
 
         # Action client for navigation
         self.nav_to_pose_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+
+        # Publisher for exploration status
+        self.status_publisher = self.create_publisher(String, '/exploration_status', 10)
 
         # Visited frontiers set
         self.visited_frontiers = set()
@@ -204,11 +208,20 @@ class ExplorerNode(Node):
         self.timer.cancel()
         self.pose_update_timer.cancel()
 
+        # 탐사 종료 메시지 발행
+        status_msg = String()
+        status_msg.data = 'end'
+        self.status_publisher.publish(status_msg)
+        self.get_logger().info("Published 'end' to /exploration_status topic.")
+        # 메시지가 확실히 발행되도록 잠시 대기
+        self.create_timer(1.0, self._shutdown_node, oneshot=True)
+
+    def _shutdown_node(self):
         map_file_path = os.path.join(os.path.expanduser('~'), 'my_explored_map')
         self.get_logger().info(f"Saving map to {map_file_path}...")
 
         try:
-            # ros2 run nav2_map_server map_saver_cli -f <file_path> \uba85\ub839\uc5b4 \uc2e4\ud589
+            # ros2 run nav2_map_server map_saver_cli -f <file_path> 명령어 실행
             subprocess.run(
                 ['ros2', 'run', 'nav2_map_server', 'map_saver_cli', '-f', map_file_path],
                 check=True, timeout=30
@@ -218,7 +231,7 @@ class ExplorerNode(Node):
             self.get_logger().error(f"Failed to save map: {e}")
 
         self.get_logger().info("Shutting down explorer node.")
-        # \ub178\ub4dc\ub97c \uc548\uc804\ud558\uac8c \uc885\ub8cc\ud558\uace0 rclpy\ub97c shutdown \uc2dc\ud0b5\ub2c8\ub2e4.
+        # 노드를 안전하게 종료하고 rclpy를 shutdown 시킵니다.
         self.destroy_node()
         rclpy.shutdown()
 

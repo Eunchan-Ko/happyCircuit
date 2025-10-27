@@ -14,11 +14,13 @@ class SmoothRobotController:
         self.publisher = publisher
 
         # --- 제어 파라미터 ---
-        self.max_linear_speed = 0.22
-        self.max_angular_speed = 3.0
-        self.acceleration = 0.02
-        self.deceleration = 0.15
-        self.update_rate = 20
+        self.max_linear_speed = 0.08 # linear 방향 최고속도
+        self.max_angular_speed = 1.0 # angular 방향 최고속도
+        self.acceleration = 0.02 # linear 방향 가속도
+        self.deceleration = 0.02 # linear 방향 감속도
+        self.angle_acceleration = 0.5 # angular 방향 가속도
+        self.angle_deceleration = 0.5 # angular 방향 감속도
+        self.update_rate = 20 # Hz
 
         # --- 상태 변수 ---
         self.target_linear_speed = 0.0
@@ -69,9 +71,9 @@ class SmoothRobotController:
 
                 # 각속도 업데이트
                 if self.current_angular_speed < self.target_angular_speed:
-                    self.current_angular_speed = min(self.target_angular_speed, self.current_angular_speed + self.acceleration)
+                    self.current_angular_speed = min(self.target_angular_speed, self.current_angular_speed + self.angle_acceleration)
                 elif self.current_angular_speed > self.target_angular_speed:
-                    self.current_angular_speed = max(self.target_angular_speed, self.current_angular_speed - self.deceleration)
+                    self.current_angular_speed = max(self.target_angular_speed, self.current_angular_speed - self.angle_deceleration)
 
                 # Twist 메시지 생성 및 발행
                 twist_msg = {

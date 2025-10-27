@@ -17,6 +17,9 @@ from flask import Flask, render_template, session
 from flask_socketio import SocketIO
 
 # --- 페이지 display
+import datetime
+
+# --- 페이지 display
 from web.control.routes import control_bp
 from web.disconnection_check.routes import disconnection_check_bp
 from web.map_viewer.routes import map_bp
@@ -53,16 +56,20 @@ if DB_connect:
         mongo_client = config.MONGODB_CLIENT
         db = mongo_client.happy_circuit_db # 데이터베이스 선택
         warnings_collection = db.warnings # 컬렉션 선택
+        maps_collection = db.maps # 지도 저장을 위한 컬렉션
         # 위치 기반 중복 저장을 방지하기 위해 2dsphere 인덱스 생성
         warnings_collection.create_index([("location", "2dsphere")])
-        logging.info("[DB] MongoDB에 성공적으로 연결 및 'warnings' 컬렉션과 인덱스 준비 완료.")
+        logging.info("[DB] MongoDB에 성공적으로 연결 및 'warnings', 'maps' 컬렉션과 인덱스 준비 완료.")
     except AttributeError:
         logging.error("[DB] 'config.py'에 'MONGODB_CLIENT'가 정의되지 않았습니다. DB 관련 기능이 비활성화됩니다.")
         warnings_collection = None
+        maps_collection = None
     except Exception as e:
         logging.error(f"[DB] MongoDB 연결 또는 설정 실패: {e}")
         warnings_collection = None
+        maps_collection = None
 warnings_collection = None
+maps_collection = None
 
 # 로봇의 현재 상태를 저장할 전역 변수 (상태 저장소)
 robot_status = {
@@ -143,6 +150,39 @@ def handle_drive_command(data):
         logging.info(f"[Web Server] 로봇 컨트롤중 (direction: \"{direction}\")")
     elif not ros_thread.robot_controller:
         logging.warning("[Web Server] 로봇 컨트롤러가 준비되지 않아 drive_command를 무시합니다.")
+
+@socketio.on('start_exploration')
+def handle_start_exploration():
+    """웹 클라이언트에서 탐사 시작 요청을 받으면 호출됩니다."""
+    logging.info("[Web Server] 탐사 시작 요청 수신.")
+    if ros_thread and ros_thread.is_connected():
+        ros_thread.start_exploration()
+        logging.info("[Web Server] ROS를 통해 탐사 시작 명령을 전송했습니다.")
+    else:
+        logging.warning("[Web Server] ROS가 연결되지 않아 탐사 시작 명령을 보낼 수 없습니다.")
+
+@socketio.on('exploration_finished')
+def handle_exploration_finished():
+    """탐사가 종료되었을 때 호출됩니다."""
+    logging.info("[Web Server] 탐사 종료 알림 수신. 최종 지도를 DB에 저장합니다.")
+    if ros_thread and maps_collection is not None:
+        final_map = ros_thread.get_latest_map()
+        if final_map:
+            try:
+                map_document = {
+                    "timestamp": datetime.datetime.utcnow(),
+                    "map_data": final_map
+                }
+                maps_collection.insert_one(map_document)
+                logging.info("[DB] 최종 지도를 MongoDB에 성공적으로 저장했습니다.")
+            except Exception as e:
+                logging.error(f"[DB] 최종 지도 저장 실패: {e}")
+        else:
+            logging.warning("[Web Server] 저장할 지도가 없습니다.")
+    elif not ros_thread:
+        logging.error("[Web Server] ROS 스레드가 실행 중이 아니라서 지도를 저장할 수 없습니다.")
+    elif maps_collection is None:
+        logging.error("[DB] MongoDB 'maps' 컬렉션이 준비되지 않아 지도를 저장할 수 없습니다.")
 
 # --- 프로그램 종료 시 실행될 정리(cleanup) 함수 ---
 def cleanup():

@@ -4,21 +4,54 @@
     max-width: 960px; /* 너무 커지지 않도록 최대 너비 설정 */
     margin: 2rem auto; /* 위아래 여백을 주고, 좌우는 자동으로 중앙 정렬 */
     padding: 2rem;
-    background-color: #ffffff; /* 흰색 배경 */
+    background-color: #161616; /* 어두운 배경 (base.css와 유사하게) */
+    border: 1px solid #ffd700; /* 금색 테두리 */
     border-radius: 8px; /* 부드러운 모서리 */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 그림자 효과 */
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.1); /* 은은한 금색 그림자 */
     text-align: center; /* 내부 텍스트 중앙 정렬 */
 }
 
 /* 지도 제목 부분 스타일 */
+.map-header {
+    margin-bottom: 2rem; /* 헤더 블록과 캔버스 사이에 여백 추가 */
+}
+
 .map-header h1 {
     margin-bottom: 0.5rem;
-    color: #333;
+    color: #c8c8c8; /* 밝은 회색 텍스트 */
 }
 
 .map-header p {
-    margin-bottom: 2rem;
-    color: #666;
+    margin-bottom: 1.5rem; /* 버튼과의 간격을 적절히 조정 */
+    color: #888; /* 약간 더 어두운 회색 */
+}
+
+#startExplorationBtn {
+    background-color: #000000; /* 검은색 배경 */
+    color: #32cd32; /* 녹색 텍스트 */
+    border: 1px solid #32cd32; /* 녹색 테두리 */
+    border-radius: 5px; /* 5px 굴곡 */
+    padding: 10px 25px; /* 내부 여백 */
+    font-family: 'Roboto Mono', monospace;
+    font-size: 1rem; /* 폰트 크기 */
+    font-weight: bold;
+    cursor: pointer; /* 마우스 커서 변경 */
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s; /* 부드러운 전환 효과 */
+    text-transform: uppercase; /* 대문자 */
+}
+
+#startExplorationBtn:hover,
+#startExplorationBtn:focus {
+    background-color: #ffd700; /* 노란색 배경 */
+    color: #161616; /* 어두운 텍스트 */
+    border-color: #ffd700; /* 노란색 테두리 */
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6); /* 호버 시 강조 효과 */
+    outline: none; /* 포커스 시 기본 아웃라인 제거 */
+}
+
+#startExplorationBtn:active {
+    transform: translateY(1px); /* 클릭 시 살짝 아래로 이동하는 효과 */
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.4); /* 클릭 시 그림자 축소 */
 }
 
 /* canvas를 감싸는 div 스타일 (반응형 대응) */

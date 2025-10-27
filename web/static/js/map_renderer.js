@@ -2,8 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('mapCanvas');
     const ctx = canvas.getContext('2d');
 
-    // 지도 데이터를 저장할 상태 변수
+    // 지도 및 로봇 위치 데이터를 저장할 상태 변수
     let currentMap = null;
+    let robotPose = null; // 로봇의 현재 위치 및 방향
 
     if (typeof socket === 'undefined') {
         console.error('Socket.IO is not available. Make sure socket.js is loaded before map_renderer.js');
@@ -11,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * 지도와 원점을 포함한 전체 캔버스를 다시 그리는 메인 함수
+     * 지도, 원점, 로봇 위치를 포함한 전체 캔버스를 다시 그리는 메인 함수
      */
     function redrawCanvas() {
         if (!currentMap) {
@@ -22,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. 지도 원점 그리기
         drawOrigin(currentMap);
+
+        // 3. 로봇 위치 그리기
+        if (robotPose) {
+            drawRobot(currentMap, robotPose);
+        }
     }
 
     /**
@@ -73,6 +79,27 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.stroke();
     }
 
+    /**
+     * 지도 위에 로봇의 현재 위치를 그리는 함수
+     * @param {object} map - 지도 데이터
+     * @param {object} pose - 로봇의 위치 및 방향 데이터 ({ translation: { x, y, z }, rotation: { x, y, z, w } })
+     */
+    function drawRobot(map, pose) {
+        const { resolution, origin, height } = map;
+        const { translation } = pose;
+
+        // 로봇의 월드 좌표를 캔버스 픽셀 좌표로 변환
+        const pixelX = (translation.x - origin.x) / resolution;
+        const pixelY = height - ((translation.y - origin.y) / resolution);
+
+        // 빨간색 점으로 로봇 위치 표시
+        ctx.fillStyle = 'red';
+        ctx.beginPath();
+        ctx.arc(pixelX, pixelY, 3, 0, 2 * Math.PI); // 반지름 5px
+        ctx.fill();
+    }
+
+
     // --- Socket.IO 이벤트 리스너 ---
 
     // 'map_update' 이벤트를 수신하면 지도 데이터를 저장하고 캔버스를 다시 그립니다.
@@ -81,5 +108,25 @@ document.addEventListener('DOMContentLoaded', () => {
         redrawCanvas();
     });
 
-    console.log('Map renderer initialized and waiting for map data...');
+    // 'tf_update' 이벤트를 수신하면 로봇 위치 데이터를 저장하고 캔버스를 다시 그립니다.
+    socket.on('tf_update', (poseData) => {
+        console.log("Received tf_update event:", poseData); // 1. 수신된 전체 데이터 확인
+
+        // odom 프레임 기준으로 base_footprint의 transform을 찾습니다.
+        const baseLinkTransform = poseData.transforms.find(t => t.header.frame_id === 'odom' && t.child_frame_id === 'base_footprint');
+        
+        if (baseLinkTransform) {
+            console.log("Found base_link transform:", baseLinkTransform.transform); // 2. 찾은 transform 확인
+            robotPose = baseLinkTransform.transform;
+            redrawCanvas();
+        } else {
+            // odom -> base_link를 찾지 못한 경우, 다른 일반적인 transform(map -> odom)을 로깅하여 데이터를 확인합니다.
+            const odomTransform = poseData.transforms.find(t => t.header.frame_id === 'map' && t.child_frame_id === 'odom');
+            if (odomTransform) {
+                console.log("Could not find odom -> base_link, but found map -> odom:", odomTransform);
+            }
+        }
+    });
+
+    console.log('Map renderer initialized and waiting for map and tf data...');
 });
