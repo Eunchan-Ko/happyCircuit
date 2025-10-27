@@ -88,3 +88,4 @@ tomli~=2.2.1
 Pygments~=2.19.2
 pyasn1_modules~=0.4.2
 pymongo>=4.0
+dotenv
