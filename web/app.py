@@ -50,6 +50,8 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- MongoDB 설정 ---
+warnings_collection = None
+maps_collection = None
 if DB_connect:
     try:
         # config.py에 정의된 MONGODB_CLIENT를 사용
@@ -62,14 +64,17 @@ if DB_connect:
         logging.info("[DB] MongoDB에 성공적으로 연결 및 'warnings', 'maps' 컬렉션과 인덱스 준비 완료.")
     except AttributeError:
         logging.error("[DB] 'config.py'에 'MONGODB_CLIENT'가 정의되지 않았습니다. DB 관련 기능이 비활성화됩니다.")
-        warnings_collection = None
-        maps_collection = None
+        DB_connect = False
     except Exception as e:
         logging.error(f"[DB] MongoDB 연결 또는 설정 실패: {e}")
-        warnings_collection = None
-        maps_collection = None
-warnings_collection = None
-maps_collection = None
+        DB_connect = False
+
+# 블루프린트 등 다른 모듈에서 안전하게 접근할 수 있도록 app.config에 저장
+app.config['DB_CONNECTED'] = DB_connect
+app.config['WARNINGS_COLLECTION'] = warnings_collection
+app.config['MAPS_COLLECTION'] = maps_collection
+
+
 
 # 로봇의 현재 상태를 저장할 전역 변수 (상태 저장소)
 robot_status = {

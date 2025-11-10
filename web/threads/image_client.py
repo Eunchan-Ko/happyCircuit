@@ -31,6 +31,7 @@ try:
     if yolo_names:
         iterable = yolo_names.items() if isinstance(yolo_names, dict) else enumerate(yolo_names)
         for idx, name in iterable:
+
             if any(k in str(name).lower() for k in config.YOLO_DAMAGE_KEYWORDS):
                 damage_class_idxs.append(int(idx))
         logging.info(f"[YOLO] '손상' 관련 클래스 인덱스 확인: {damage_class_idxs}")
@@ -179,7 +180,7 @@ class ImageClientThread(threading.Thread):
                                                 logging.info(f"[DB] 손상 감지: 새로운 위치({odom_x:.2f}, {odom_y:.2f})의 경고를 DB에 저장했습니다 (이미지: {filename}).")
                                         else:
                                             # odom 데이터가 유효하지 않을 경우, 시간 기반으로 중복 저장 방지
-                                            na_save_interval_seconds = 10 # 최소 저장 간격 (초)
+                                            na_save_interval_seconds = 100 # 최소 저장 간격 (초) (원래 10초인데 내 컴퓨터 부하 살려줘 이슈로 100초로 변경)
 
                                             # 'location' 필드가 없는 가장 최근 문서를 찾음
                                             last_na_warning = self.warnings_collection.find_one(

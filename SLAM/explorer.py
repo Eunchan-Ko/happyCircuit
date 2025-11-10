@@ -296,3 +296,10 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+if self.flagcount < 3
+    if distance >
+
+else
+    if distance

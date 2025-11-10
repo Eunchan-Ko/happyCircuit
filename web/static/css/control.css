@@ -6,7 +6,6 @@ body {
     color: white;
     height: 100vh;
     margin: 0;
-    overflow: hidden; /* 스크롤 방지 */
 }
 
 main {

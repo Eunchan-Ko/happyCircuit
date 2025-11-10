@@ -1,0 +1,111 @@
+body {
+    background-color: #1e1e1e;
+
+}
+.main-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+.main-container h1, .main-container p {
+    color: #c8c8c8;
+}
+.table-container {
+    max-height: 60vh; /* 화면 높이의 60%를 최대로 사용 */
+    overflow-y: auto; /* 내용이 넘치면 수직 스크롤 생성 */
+    border: 1px solid #444;
+    border-radius: 8px;
+}
+.warnings-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.warnings-table thead th {
+    position: sticky; /* 스크롤 시 헤더 고정 */
+    top: 0;
+    background-color: #343a40;
+    color: #fff;
+    z-index: 10;
+    border-bottom: 2px solid #ffd700;
+}
+.warnings-table th, .warnings-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #444444;
+    color: #c8c8c8;
+}
+.warnings-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+/* Zebra-striping for better readability */
+.warnings-table tbody tr:nth-of-type(even) {
+    background-color: #303030;
+}
+.warnings-table tbody tr:hover {
+    background-color: #4a4a4a;
+}
+.no-warnings, .db-disconnected {
+    text-align: center;
+    padding: 50px;
+    font-size: 1.2em;
+    color: #888;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    border: 1px dashed #444444;
+}
+
+/* Modal (Layer Popup) Styles for robust centering */
+.modal-overlay {
+    display: none; /* Hidden by default, changed to 'flex' by JS */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.85);
+    /* Use Flexbox for perfect centering */
+    justify-content: center;
+    align-items: center;
+}
+.modal-overlay.is-visible {
+    display: flex; !important;
+    justify-content: center;
+    align-items: center;
+}
+.modal-content {
+    position: relative;
+    background-color: #2a2a2a;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #ffd700;
+    width: auto;
+    max-width: 90vw; /* 화면 너비의 80% */
+    max-height: 90vh; /* 화면 높이의 80% */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+}
+.modal-content img {
+    width: 100%;
+    height: auto;
+    object-fit: contain; /* 이미지 비율 유지 */
+    max-height: calc(90vh - 50px); /* 패딩과 닫기 버튼 공간 고려 */
+    border-radius: 4px;
+}
+.close-button {
+    color: #aaa;
+    align-self: flex-end;
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 5px;
+}
+.close-button:hover, .close-button:focus {
+    color: #ffd700;
+}

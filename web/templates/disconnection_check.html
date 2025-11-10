@@ -1,135 +1,102 @@
 {% extends "base.html" %}
 
-{% block title %}단선확인{% endblock %}
+{% block title %}감지된 경고 목록{% endblock %}
 
-{% block head %}
-    {{ super() }}
-    <style>
-        .image-container {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 20px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-        }
-        .image-container img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin-top: 10px;
-            border-radius: 4px;
-        }
-        .detection-status {
-            font-weight: bold;
-            margin-top: 10px;
-            padding: 5px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .status-detected {
-            background-color: #ffe0e0; /* Light red */
-            color: #d32f2f; /* Dark red */
-        }
-        .status-not-detected {
-            background-color: #e0ffe0; /* Light green */
-            color: #388e3c; /* Dark green */
-        }
-        .process-button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .process-button:hover {
-            background-color: #0056b3;
-        }
-        #loading-indicator {
-            display: none;
-            margin-top: 10px;
-            font-style: italic;
-            color: #555;
-        }
-    </style>
+{% block styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/disconnection_ckeck.css') }}">
 {% endblock %}
 
 {% block content %}
-    <h1>단선확인</h1>
-    <p>이 페이지에서는 지정된 디렉토리의 이미지들을 분석하여 단선 여부를 확인합니다.</p>
+    <div class="main-container">
+        <h1>감지된 경고 목록</h1>
 
-    <button class="process-button" onclick="processImages()">이미지 분석 시작</button>
-    <div id="loading-indicator">이미지 분석 중... 잠시만 기다려 주세요.</div>
-    <div id="results-container">
-        <!-- Analysis results will be displayed here -->
+        {% if db_connected %}
+            <p>데이터베이스에서 실시간으로 감지된 경고 목록을 표시합니다. 자세히 보려면 행을 클릭하세요.</p>
+            {% if warnings %}
+                <div class="table-container">
+                    <table class="warnings-table">
+                        <thead>
+                            <tr>
+                                <th>감지 시간 (UTC)</th>
+                                <th>감지 위치 (X, Y)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for warning in warnings %}
+                                <tr class="warning-row" data-image-path="{{ url_for('static', filename=warning.image_path) }}">
+                                    <td>{{ warning.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>
+                                        X: {{ '%.2f'|format(warning.odom.x) if warning.odom.x is number else warning.odom.x }},
+                                        Y: {{ '%.2f'|format(warning.odom.y) if warning.odom.y is number else warning.odom.y }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="no-warnings">
+                    <p>아직 감지된 경고가 없습니다.</p>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="db-disconnected">
+                <p>데이터베이스에 연결되지 않았습니다.</p>
+                <p>순찰을 먼저 진행해주세요.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- The Modal -->
+    <div id="imageModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <img id="modalImage" src="" alt="Warning Image">
+        </div>
     </div>
 
     <script>
-        async function processImages() {
-            const resultsContainer = document.getElementById('results-container');
-            const loadingIndicator = document.getElementById('loading-indicator');
-            resultsContainer.innerHTML = ''; // Clear previous results
-            loadingIndicator.style.display = 'block'; // Show loading indicator
+        document.addEventListener('DOMContentLoaded', function () {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const closeBtn = document.querySelector('.close-button');
 
-            try {
-                const response = await fetch('/api/process_disconnection_images', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
+            function openModal(imagePath) {
+                modalImg.src = imagePath;
+                modal.style.display = 'flex'; // Use flex to enable centering
+            }
+
+            function closeModal() {
+                modal.style.display = 'none';
+                modalImg.src = ''; // Clear image src
+            }
+
+            document.querySelectorAll('.warning-row').forEach(row => {
+                row.addEventListener('click', function () {
+                    const imagePath = this.dataset.imagePath;
+                    if (imagePath) {
+                        openModal(imagePath);
                     }
                 });
-                const data = await response.json();
+            });
 
-                loadingIndicator.style.display = 'none'; // Hide loading indicator
-
-                if (response.ok) {
-                    if (data.message) { // Handle case with no images found
-                        resultsContainer.innerHTML = `<p>${data.message}</p>`;
-                    } else {
-                        data.forEach(result => {
-                            const imageContainer = document.createElement('div');
-                            imageContainer.className = 'image-container';
-
-                            const filenameEl = document.createElement('h3');
-                            filenameEl.textContent = `파일: ${result.filename}`;
-                            imageContainer.appendChild(filenameEl);
-
-                            if (result.image_data) {
-                                const imgEl = document.createElement('img');
-                                imgEl.src = `data:image/jpeg;base64,${result.image_data}`;
-                                imgEl.alt = `Processed ${result.filename}`;
-                                imageContainer.appendChild(imgEl);
-                            } else {
-                                const errorEl = document.createElement('p');
-                                errorEl.style.color = 'red';
-                                errorEl.textContent = `이미지 처리 실패: ${result.message}`;
-                                imageContainer.appendChild(errorEl);
-                            }
-
-                            const statusEl = document.createElement('p');
-                            statusEl.className = 'detection-status';
-                            if (result.disconnection_detected) {
-                                statusEl.classList.add('status-detected');
-                                statusEl.textContent = '단선 감지됨 (0.9 이상)';
-                            } else {
-                                statusEl.classList.add('status-not-detected');
-                                statusEl.textContent = '단선 감지 안됨';
-                            }
-                            imageContainer.appendChild(statusEl);
-
-                            resultsContainer.appendChild(imageContainer);
-                        });
-                    }
-                } else {
-                    resultsContainer.innerHTML = `<p style="color: red;">오류 발생: ${data.error || '알 수 없는 오류'}</p>`;
-                }
-            } catch (error) {
-                loadingIndicator.style.display = 'none'; // Hide loading indicator
-                resultsContainer.innerHTML = `<p style="color: red;">네트워크 오류 또는 서버 응답 문제: ${error.message}</p>`;
-                console.error('Error processing images:', error);
+            if(closeBtn) {
+                closeBtn.addEventListener('click', closeModal);
             }
-        }
+
+            // Close modal if overlay is clicked
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            // Close modal with Escape key
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && modal.style.display === 'flex') {
+                    closeModal();
+                }
+            });
+        });
     </script>
 {% endblock %}
